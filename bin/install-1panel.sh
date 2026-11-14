@@ -28,13 +28,24 @@ else
   # 优先从项目 GitHub 仓库的 bt_res 拉（用户 clone 后自带，零额外下载）
   GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/Orengr/doubao/main}"
   cd /tmp
+  # 带校验的下载：必须 >40MB 且 tar 完整，否则重试/回退
+  try_dl() {
+    local url="$1"
+    for i in 1 2 3; do
+      curl -sL --max-time 240 -o 1p.tar.gz "$url" 2>/dev/null
+      local sz=$(stat -c%s 1p.tar.gz 2>/dev/null || echo 0)
+      if [ "$sz" -ge 40000000 ] && tar tzf 1p.tar.gz >/dev/null 2>&1; then
+        echo "[*] 1Panel 下载OK: $sz 字节 (第${i}次)"; return 0
+      fi
+      echo "[*] 第${i}次不完整($sz)，重试…"; sleep 2
+    done
+    return 1
+  }
   echo "下载: $GITHUB_RAW/bt_res/1panel.tar.gz"
-  curl -fsSL --max-time 180 -o 1p.tar.gz "$GITHUB_RAW/bt_res/1panel.tar.gz" || {
-    echo "仓库离线包不可用，回退官方源"
-    curl -fsSL -o 1p.tar.gz "$URL" || {
-      echo "官方源失败，尝试镜像"
-      curl -fsSL -o 1p.tar.gz "${URL/resource.fit2cloud.com/resource.1panel.pro}" || exit 1
-    }
+  try_dl "$GITHUB_RAW/bt_res/1panel.tar.gz" || \
+  try_dl "$URL" || \
+  try_dl "${URL/resource.fit2cloud.com/resource.1panel.pro}" || {
+    echo "所有源均失败"; exit 1
   }
   tar xzf 1p.tar.gz
   SRC="1panel-${VERSION}-linux-${A}"

@@ -145,6 +145,18 @@ if ! pgrep -f "dbp-watch.py" >/dev/null 2>&1; then
   fi
 fi
 
+# ---------- 4.5 注册 1Panel（成品包解压后） ----------
+if [ -x "$PEND/1panel/1panel" ]; then
+  mkdir -p "$PEND/1panel-data"
+  $SUDO cp "$PEND/1panel/1panel" /usr/local/bin/1panel 2>/dev/null
+  $SUDO cp "$PEND/1panel/1pctl" /usr/local/bin/1pctl 2>/dev/null
+  $SUDO chmod +x /usr/local/bin/1panel /usr/local/bin/1pctl 2>/dev/null
+  if [ -f /usr/local/bin/1pctl ]; then
+    $SUDO sed -i "s|^BASE_DIR=.*|BASE_DIR=$PEND/1panel-data|" /usr/local/bin/1pctl 2>/dev/null
+    echo "[4.5] 1Panel 已注册（数据目录 $PEND/1panel-data）"
+  fi
+fi
+
 # ---------- 5. 自检 ----------
 sleep 8
 echo "[5] === 自检 ==="

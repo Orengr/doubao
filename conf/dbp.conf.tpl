@@ -19,7 +19,7 @@ stderr_logfile=__PEND__/log/ctl.err
 environment=PEND="__PEND__",CTL_PORT="17800",PANEL_PORT="18090",BIND="127.0.0.1"
 
 [program:dbp-1panel]
-command=/usr/local/bin/1panel
+command=__PEND__/1panel/1panel
 directory=__PEND__/1panel-data
 user=root
 autostart=true

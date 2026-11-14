@@ -321,33 +321,43 @@ puser, ppass = sys.argv[5], sys.argv[6]
 raw = sys.argv[7]
 
 inner = f"""#!/bin/bash
+# 豆包沙箱 · 成品包一步部署（下载解压即用，零公网安装）
 set -e
 PEND=/home/user/.dsh_pend
-mkdir -p $PEND/bin $PEND/conf $PEND/log $PEND/state $PEND/www $PEND/frp $PEND/tasks
-
-echo "[1/5] 下载组件包"
+mkdir -p $PEND/log $PEND/state $PEND/tasks
 cd /tmp
-curl -sL -o dbp-pkg.tar.gz "{raw}/pkg.tar.gz"
-mkdir -p /tmp/dbp-x && tar xzf dbp-pkg.tar.gz -C /tmp/dbp-x
-for d in bin conf web; do
-  [ -d "/tmp/dbp-x/$d" ] && cp -rf /tmp/dbp-x/$d/. $PEND/$d/ 2>/dev/null || true
+
+echo "[1/4] 下载成品包（约 58MB，含全部二进制）"
+dl() {{
+  local url="$1" dst="$2" min="$3"
+  for i in 1 2 3; do
+    curl -sL --max-time 300 -o "$dst" "$url" 2>/dev/null
+    local sz=$(stat -c%s "$dst" 2>/dev/null || echo 0)
+    if [ "$sz" -ge "$min" ] && tar tzf "$dst" >/dev/null 2>&1; then
+      echo "    下载OK: $sz 字节 (第${{i}}次)"; return 0
+    fi
+    echo "    第${{i}}次不完整($sz)，重试…"; sleep 2
+  done
+  return 1
+}}
+dl "{raw}/bt_res/doubao-bundle.tar.gz" bundle.tar.gz 50000000 || \
+dl "{raw}/pkg.tar.gz" bundle.tar.gz 10000 || {{
+  echo "成品包下载失败，请检查 GitHub 地址"; exit 1
+}}
+
+echo "[2/4] 解压到持久卷（解压即用，不用再装）"
+tar xzf bundle.tar.gz -C /tmp
+B=/tmp/doubao-bundle
+[ -d "$B" ] || B=/tmp/dbp-x
+for d in bin conf web frp 1panel; do
+  [ -d "$B/$d" ] && cp -rf "$B/$d" $PEND/ 2>/dev/null || true
 done
-chmod +x $PEND/bin/*.sh $PEND/bin/*.py 2>/dev/null || true
-ls $PEND/bin/ | head -10
+chmod +x $PEND/bin/*.sh $PEND/bin/*.py $PEND/frp/frpc $PEND/1panel/1panel $PEND/1panel/1pctl 2>/dev/null || true
+echo "    bin: $(ls $PEND/bin | wc -l) 个脚本"
+echo "    frpc: $(stat -c%s $PEND/frp/frpc 2>/dev/null || echo 0) 字节"
+echo "    1panel: $(stat -c%s $PEND/1panel/1panel 2>/dev/null || echo 0) 字节"
 
-echo "[2/5] 安装 frp 客户端"
-cd $PEND/frp
-if [ ! -x frpc ]; then
-  # 优先从中转机内网拉（零公网下载，不吃额度）
-  curl -sL -o frp.tar.gz "{raw}/bt_res/frp.tar.gz" || \
-  curl -sL -o frp.tar.gz "https://ghfast.top/https://github.com/fatedier/frp/releases/download/v0.72.0/frp_0.72.0_linux_amd64.tar.gz"
-  tar xzf frp.tar.gz
-  cp frp_0.72.0_linux_amd64/frpc ./frpc
-  chmod +x frpc
-fi
-ls -la frpc | awk '{{print "frpc:", $5, "字节"}}'
-
-echo "[3/5] 写入配置"
+echo "[3/4] 写 frpc 配置"
 cat > $PEND/frp/frpc.toml <<FRPC
 serverAddr = "{addr}"
 serverPort = 7000
@@ -369,24 +379,13 @@ localPort = {panel}
 remotePort = {panel}
 FRPC
 
+# 生成 supervisord 配置
 NODE=$(command -v node || echo "/usr/bin/node")
 sed -e "s|__PEND__|$PEND|g" -e "s|__NODE__|$NODE|g" $PEND/conf/dbp.conf.tpl > $PEND/conf/dbp.conf
-echo "配置已生成"
 
-echo "[4/5] 安装 1Panel（后台）"
-if [ ! -x /usr/local/bin/1panel ]; then
-  PANEL_USER={puser} PANEL_PASS={ppass} bash $PEND/bin/install-1panel.sh > $PEND/log/install-1panel.out 2>&1 &
-  echo "1Panel 后台安装中"
-else
-  echo "1Panel 已安装"
-fi
-
-echo "[5/5] 启动服务"
-pkill -x frpc 2>/dev/null || true
-sleep 1
-nohup $PEND/frp/frpc -c $PEND/frp/frpc.toml > $PEND/log/frpc.log 2>&1 &
-sleep 6
-tail -8 $PEND/log/frpc.log
+echo "[4/4] 拉起服务"
+cd $PEND
+PEND=$PEND CTL_PORT={ctl} PANEL_PORT={panel} sh bin/ensure.sh 2>&1 | tail -20
 
 echo "===== 部署完成 ====="
 """
