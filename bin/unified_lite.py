@@ -187,8 +187,19 @@ input{background:#1a2233;border:1px solid #243044;border-radius:8px;color:#fff;p
 </div>
 
 <script>
-async function post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d||{})});return r.json()}
-async function get(u){const r=await fetch(u);return r.json()}
+async function post(u,d){
+  try{const r=await fetch(u+'?t='+Date.now(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d||{})});return await r.json()}
+  catch(e){showErr('请求失败: '+e.message+'<br>备用地址: http://114.215.204.238/lite/');return {ok:false,err:e.message}}
+}
+async function get(u){
+  try{const r=await fetch(u+'?t='+Date.now());return await r.json()}
+  catch(e){showErr('请求失败: '+e.message+'<br>备用地址: http://114.215.204.238/lite/');return {err:e.message}}
+}
+function showErr(html){
+  let el=document.getElementById('errBox');
+  if(!el){el=document.createElement('div');el.id='errBox';el.className='card';document.body.prepend(el)}
+  el.innerHTML='<h2 style="color:#ef4444">连接异常</h2><div class="st">'+html+'</div>';
+}
 async function newQr(){
   document.getElementById('loginState').innerText='正在获取二维码…';
   const d=await post('/api/qr_new');
@@ -302,7 +313,11 @@ class H(BaseHTTPRequestHandler):
                 "err": "验证码提交接口待补（需要真实手机号触发一次）"})
         return self._json({"err":"not found"})
 
+class Server(ThreadingHTTPServer):
+    request_queue_size = 128      # 手机浏览器并发连接多，默认5太小
+    daemon_threads = True
+    allow_reuse_address = True
+
 if __name__ == "__main__":
-    threading.Thread(target=lambda: None, daemon=True).start()
     log.info(f"unified_lite 启动 :{PORT}")
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    Server(("0.0.0.0", PORT), H).serve_forever()
