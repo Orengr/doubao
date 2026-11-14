@@ -1,0 +1,28 @@
+*.log
+*.out
+*.err
+*.tar.gz
+frpc
+frps
+cloudflared
+1panel*
+state/
+log/
+tasks/
+__pycache__/
+*.pyc
+.DS_Store
+# 本地配置/运行态（不进仓库）
+config.env
+*.log
+*.out
+*.err
+ka_state.json
+login_guard.json
+renew_state.json
+NEW_FRPC_TOML
+SANDBOX_CMDS.txt
+
+# 例外：离线资源包必须随仓库分发（成品包）
+!bt_res/
+!bt_res/*.tar.gz
