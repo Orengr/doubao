@@ -318,8 +318,45 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"ok": False, "err": str(e)[:100]})
         if p == "/api/sms_submit":
-            return self._json({"ok": False,
-                "err": "验证码提交接口待补（需要真实手机号触发一次）"})
+            ph = (body.get("phone") or "").strip()
+            code = (body.get("code") or "").strip()
+            if not ph or not code:
+                return self._json({"ok": False, "err": "手机号或验证码为空"})
+            plain_m = ("+86 " + ph).encode()
+            enc_m = "".join(f"{b^5:02x}" for b in plain_m)
+            enc_c = "".join(f"{b^5:02x}" for b in code.encode())
+            url = (f"{BASE_ACC}/passport/web/sms_login/?{Q_ACC}"
+                   f"&ts={int(time.time())}&p_ca=4.0.26&multi_login=1&account_sdk_source=web")
+            data = urllib.parse.urlencode({"mix_mode":"1","mobile":enc_m,
+                "code":enc_c,"login_only":"false","fixed_mix_mode":"1"}).encode()
+            req = urllib.request.Request(url, data=data, headers={
+                "User-Agent": UA, "Referer": "https://www.doubao.com/",
+                "Content-Type": "application/x-www-form-urlencoded"})
+            try:
+                r = urllib.request.urlopen(req, timeout=20)
+                t = r.read().decode()[:400]
+                # 成功响应会带 Set-Cookie（session），收集
+                setcks = r.headers.get_all("Set-Cookie") or []
+                pairs = []
+                import http.cookiejar as _cj
+                cj = _cj.CookieJar()
+                op2 = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+                op2.addheaders = [("User-Agent", UA), ("Referer", "https://www.doubao.com/")]
+                try:
+                    op2.open("https://www.doubao.com/chat/", timeout=20)
+                except Exception: pass
+                pairs = [f"{c.name}={c.value}" for c in cj if c.value]
+                if pairs and len(pairs) >= 10:
+                    import time as _t
+                    bak = f"/root/ck_backups/ck_{_t.strftime('%Y%m%d_%H%M%S')}.txt"
+                    os.makedirs("/root/ck_backups", exist_ok=True)
+                    open(bak,"w").write("\n".join(pairs))
+                    open(CK,"w").write("\n".join(pairs))
+                    return self._json({"ok": True, "login": True,
+                                       "cookies": len(pairs), "resp": t[:150]})
+                return self._json({"ok": False, "err": "登录未完成: "+t[:120]})
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)[:100]})
         return self._json({"err":"not found"})
 
 class Server(ThreadingHTTPServer):

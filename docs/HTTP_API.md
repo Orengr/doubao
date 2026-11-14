@@ -158,3 +158,44 @@ passport_jssdk_version=4.4.6&passport_jssdk_type=normal&is_from_ttaccountsdk=1
      保活引擎 → ka_http.py
      旧 ka_v13/unified 浏览器版 → 废弃
 ```
+
+
+---
+
+## 六、chat/completion 的 a_bogus 障碍（2026-11-14 深夜结论）
+
+### 现象
+纯 HTTP 重放（结构完全一致、msToken 来自 cookie、device_id 等全参数复用）：
+```
+710020202 invalid param（is_replay:false）← 缺 a_bogus
+710020702 system error（is_replay:true）  ← 旧 a_bogus 被判重放
+```
+
+### 已验证
+- msToken 在 cookie 里（每 4 分钟轮换），query 里的必须与之配套
+- `window.bdms.frontierSign(url, body)` 可生成 `{X-Bogus}` header，
+  但 X-Bogus 是旧版 header 签名，服务端要的是 query 里的 `a_bogus`（新版）
+- a_bogus 由豆包前端 JS 动态生成，绑定 URL+body+UA+时间戳，无法重放
+
+### 结论
+发送通道两条路：
+1. **浏览器 UI 输入**（当前唯一验证可行）——豆包前端自动完成签名
+2. 逆向 a_bogus 算法（字节系有开源实现，但豆包版本可能定制）
+
+### 当前架构（混合）
+```
+unified（浏览器版，已修复超时+CPU问题）: 登录/发送（UI 通道）
+ka_v13: 保活循环（调 unified /send）
+ka_http: cookie 活性检查（纯 HTTP，每 30s）
+unified_lite 页面: 独立管理台（备用，端口可切换）
+```
+
+### 已打通可复用的接口（纯 HTTP 无签名）
+```
+POST /im/chain/recent_conv       会话列表
+POST /im/conversation/batch_get  会话详情
+POST /passport/web/send_code/    短信验证码（XOR混淆手机号）
+POST /passport/web/sms_login/    验证码登录（XOR混淆手机号+验证码）
+GET  /passport/web/get_qrcode/   QR 拉取
+GET  /passport/web/check_qrconnect/  QR 状态轮询
+```
