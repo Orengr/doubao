@@ -214,11 +214,11 @@ async function pollQr(){
 }
 async function sendSms(){
   const d=await post('/api/sms_send',{phone:document.getElementById('phone').value});
-  alert(d.ok?('验证码已发送':'失败: '+d.err));
+  alert(d.ok ? '验证码已发送' : '失败: '+(d.err||''));
 }
 async function submitCode(){
   const d=await post('/api/sms_submit',{phone:document.getElementById('phone').value,code:document.getElementById('code').value});
-  if(d.login){document.getElementById('loginState').innerHTML='<span class="ok">✓ 登录成功</span>';}else alert('失败: '+d.err);
+  if(d.login){document.getElementById('loginState').innerHTML='<span class="ok">✓ 登录成功</span>';}else{alert('失败: '+(d.err||''));}
 }
 function smsBoxToggle(){const b=document.getElementById('smsBox');b.style.display=b.style.display==='none'?'block':'none'}
 async function loadSys(){
@@ -234,7 +234,7 @@ async function loadSys(){
 }
 async function kaCtl(a){
   const d=await post('/api/ka_ctl',{action:a});
-  alert(d.ok?'已'+a:'失败: '+(d.err||''));loadSys();
+  alert(d.ok ? ('已'+a) : ('失败: '+(d.err||'')));loadSys();
 }
 loadSys();setInterval(loadSys,15000);
 </script></body></html>"""
