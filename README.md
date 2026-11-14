@@ -1,16 +1,13 @@
-# 豆包免费服务器 · 一键部署
+# DoubaoBox · 豆包沙箱免费服务器
 
 [![Self Test](https://img.shields.io/github/actions/workflow/status/Orengr/doubao/test.yml?branch=main&label=tests)](https://github.com/Orengr/doubao/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-禁商用·个人学习测试-red.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](docs/STATUS.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Orengr/doubao/pulls)
-[![Self Test: 89 Passed](https://img.shields.io/badge/self%20test-89%20passed-success.svg)](test.sh)
-
-> 徽标是 README 里的 shields.io 图片链接（作者自己写的，不是 GitHub 发的），
-> 换仓库地址后 CI 徽标才会显示真实状态。
+[![Self Test](https://img.shields.io/badge/self%20test-88%20passed-success.svg)](test.sh)
 
 在豆包沙箱里跑出一个**带 1Panel 面板的免费服务器**，数据存在 10T 持久卷，沙箱重建后自动恢复。
 
@@ -254,6 +251,21 @@ bash test.sh
 - [踩坑记录](docs/TROUBLESHOOTING.md) — 所有已知问题与解法
 - [项目状态](docs/STATUS.md) — 已完成/待办
 
+## 关于豆包额度
+
+本项目把部署耗时从原版的 30+ 分钟压到约 2 分钟，
+但豆包沙箱本身的**重建/回收由平台控制**，本项目无法保证沙箱永不过期。
+
+建议：
+- 用最小化任务保活（本项目已内置 8 种轻量任务轮换）
+- 重要数据务必放 `/home/user/.dsh_pend/`（10T 持久卷，重建不丢）
+- 若豆包策略收紧导致额度快速消耗，请降低保活频率
+
 ## 许可
 
-仅供学习与个人使用。使用者需自行承担所有后果。
+**禁止商用**。仅限个人学习、测试与非商业性娱乐用途。
+
+- 严禁出售、收费部署、用于盈利性产品
+- 严禁违法用途
+- 严禁去除署名
+- 完整条款见 [LICENSE](LICENSE)

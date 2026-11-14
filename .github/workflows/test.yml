@@ -1,4 +1,4 @@
-name: Self Test
+name: DoubaoBox Self Test
 
 on:
   push:
