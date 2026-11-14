@@ -359,7 +359,6 @@ def browser_worker():
             PROFILE, headless=True,
             args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu",
                   "--disable-blink-features=AutomationControlled",
-                  "--disable-background-timer-throttling",
                   "--disable-features=IsolateOrigins,site-per-process",
                   "--no-first-run","--no-default-browser-check",
                   "--disable-infobars","--disable-notifications",
@@ -383,6 +382,11 @@ def browser_worker():
         except Exception:
             pass
 
+        try:
+            ctx.set_default_timeout(15000)
+            ctx.set_default_navigation_timeout(30000)
+        except Exception:
+            pass
         PG["page"] = pg
         PG["ctx"] = ctx
 
@@ -410,7 +414,7 @@ def browser_worker():
             if loop_i % 12 == 0:
                 try:
                     u = pg.url or ""
-                    body_now = pg.inner_text("body")[:400]
+                    body_now = pg.inner_text("body", timeout=6000)[:400]
                     dropped = ("from_logout" in u) or (
                         "登录" in body_now[:200] and "新对话" not in body_now)
                     if dropped and STATE.get("logged"):
@@ -430,6 +434,10 @@ def browser_worker():
                 SEND_QUEUE.clear()
             for item in pending:
                 try:
+                    try:
+                        pg.set_default_timeout(15000)
+                    except Exception:
+                        pass
                     if item.get("action") == "debug":
                         try:
                             info = {"url": pg.url}

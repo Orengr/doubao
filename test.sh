@@ -646,6 +646,20 @@ else
   bad "缺 SSH 自动安装流程"
 fi
 
+# 11.15 浏览器卡死保护
+echo
+echo "[11.15] 浏览器卡死保护"
+if grep -q 'set_default_timeout(15000)' "$ROOT/bin/unified.py"; then
+  ok "页面操作15秒超时"
+else
+  bad "缺全局超时"
+fi
+if grep -q 'timeout=6000' "$ROOT/bin/unified.py"; then
+  ok "循环登录检查短超时"
+else
+  bad "循环内缺超时"
+fi
+
 # ---------- 12. 汇总 ----------
 echo
 echo "================================================"
