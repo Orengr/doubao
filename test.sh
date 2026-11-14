@@ -347,7 +347,8 @@ fi
 echo
 echo "[10] healthcheck 逻辑"
 
-HC_OUT=$(python3 - <<'PYEOF' 2>&1
+# 独立脚本文件（避免 heredoc 嵌套换行问题）
+cat > /tmp/hc_test.py <<'HCEOF'
 import sys, os, tempfile
 sys.path.insert(0, "bin")
 import importlib.util
@@ -355,31 +356,30 @@ spec = importlib.util.spec_from_file_location("hc", "bin/healthcheck.py")
 hc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hc)
 
-# 完整 cookie
 t1 = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-t1.write("sessionid=abc123\nsid_guard=def456\nuid_tt=ghi789\n")
+t1.write("sessionid=abc123" + chr(10) + "sid_guard=def456" + chr(10) + "uid_tt=ghi789" + chr(10))
 t1.close()
 ck = hc.check_cookie(t1.name)
 print("COMPLETE", ck["ok"], ck["count"])
 
-# 指纹变化
 t2 = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-t2.write("sessionid=DIFF\nsid_guard=def456\nuid_tt=ghi789\n")
+t2.write("sessionid=DIFF" + chr(10) + "sid_guard=def456" + chr(10) + "uid_tt=ghi789" + chr(10))
 t2.close()
 ck2 = hc.check_cookie(t2.name)
 print("FP_DIFF", ck["fp"] != ck2["fp"])
 
-# 缺失检测
 t3 = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-t3.write("sessionid=abc\n")
+t3.write("sessionid=abc" + chr(10))
 t3.close()
 ck3 = hc.check_cookie(t3.name)
 print("MISSING", not ck3["ok"], len(ck3["missing"]))
 
 for f in [t1.name, t2.name, t3.name]:
     os.unlink(f)
-PYEOF
-)
+HCEOF
+
+HC_OUT=$(python3 /tmp/hc_test.py 2>&1)
+echo "$HC_OUT" | head -8 | sed 's/^/    /'
 
 if echo "$HC_OUT" | grep -q "COMPLETE True 3"; then
   ok "cookie 解析(3项)"
@@ -396,6 +396,7 @@ if echo "$HC_OUT" | grep -q "MISSING True"; then
 else
   bad "缺失检测失效"
 fi
+rm -f /tmp/hc_test.py
 
 # ---------- 11. install-1panel 逻辑（成品包版）----------
 echo
