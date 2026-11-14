@@ -1,0 +1,393 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DoubaoBox · 完整使用手册</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+background:#0b0f19;color:#e8eefc;line-height:1.8;padding:20px 14px 60px;max-width:760px;margin:0 auto}
+h1{font-size:21px;margin:20px 0 14px;color:#fff}
+h2{font-size:18px;margin:26px 0 10px;padding:8px 12px;background:#121826;
+border-left:4px solid #4d8dff;border-radius:6px}
+h3{font-size:15px;margin:18px 0 8px;color:#4d8dff}
+p{margin:10px 0;font-size:13.5px}
+pre{background:#121826;border:1px solid #243044;border-radius:10px;
+padding:12px;overflow-x:auto;font-size:12px;margin:12px 0;line-height:1.6}
+pre.code{color:#9fe8c0}
+code{background:#1a2233;padding:2px 6px;border-radius:4px;font-size:12px;
+color:#9fe8c0;font-family:ui-monospace,monospace}
+pre code{padding:0;background:transparent}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12.5px}
+td{padding:8px 10px;border:1px solid #243044}
+tr td:first-child{color:#7f8da8}
+ul{margin:10px 0;padding-left:22px}
+li{margin:6px 0;font-size:13.5px}
+hr{border:0;border-top:1px solid #243044;margin:24px 0}
+a{color:#4d8dff;text-decoration:none}
+.top{position:sticky;top:0;background:rgba(11,15,25,.95);padding:10px 0;
+border-bottom:1px solid #243044;margin-bottom:16px;z-index:10}
+.top a{font-size:13px}
+</style></head><body>
+<div class="top"><a href="/">← 返回导航页</a> · 语言: <b>中文</b> | <a href="/manual_en.html">English</a></div>
+<h2>DoubaoBox · 完整使用手册（大白话版）</h2>
+<p>**🌐 Language / 语言切换：**</p>
+<ul>
+<li>简体中文（本页）：docs/MANUAL.md</li>
+<li>English: [docs/en/MANUAL.md](en/MANUAL.md)</li>
+</ul>
+<p>&gt; 切换方法：在 GitHub 网页上打开本文件后，把地址里的</p>
+<p>&gt; `docs/MANUAL.md` 换成 `docs/en/MANUAL.md` 即可。</p>
+<p>&gt; 这份手册写给第一次接触服务器的人。</p>
+<p>&gt; 每一步都写了「点哪里」「输入什么」「看到什么算成功」。</p>
+<p>&gt; 按顺序做，不要跳步。</p>
+<hr>
+<h2>第 0 部分 · 先搞懂 3 个问题</h2>
+<h3>这个东西是什么？</h3>
+<p>它能让你的**豆包 AI 助手**变成一台**24 小时在线的小服务器**。</p>
+<p>在这台服务器上，你可以：</p>
+<ul>
+<li>搭自己的个人网站</li>
+<li>存文件</li>
+<li>学习 Linux 和服务器运维</li>
+</ul>
+<h3>需要花多少钱？</h3>
+<p>**0 元。** 所有组件都是免费的。</p>
+<h3>需要准备什么？（一共 4 样，下面会一步步教）</h3>
+<table class="tbl">
+<tr><td>#</td><td>东西</td><td>说明</td><td>大概耗时</td></tr>
+<tr><td>①</td><td>一台有公网 IP 的小电脑</td><td>叫「中转机」，是你自己的</td><td>注册 VPS 约 5 分钟</td></tr>
+<tr><td>②</td><td>一个豆包账号</td><td>你手机里装的那个豆包 App 的账号</td><td>已经有了</td></tr>
+<tr><td>③</td><td>扫一次码</td><td>让系统认出你的账号</td><td>30 秒</td></tr>
+<tr><td>④</td><td>（可选）一个域名</td><td>想用好记的网址才需要</td><td>10 分钟</td></tr>
+</table>
+<p>**明确不需要的：**</p>
+<ul>
+<li>❌ 不需要花钱买面板</li>
+<li>❌ 不需要域名备案</li>
+<li>❌ 不需要信用卡</li>
+<li>❌ 不需要会写代码</li>
+</ul>
+<hr>
+<h2>第 1 部分 · 准备中转机（第①样）</h2>
+<h3>1.1 什么是「中转机」？</h3>
+<p>一台 24 小时开着的小电脑。它的作用像「传达室」：</p>
+<p>别人访问你的网址 → 先到传达室 → 传达室把请求转给你在豆包里的真正服务器。</p>
+<p>**这台机器是你自己的，跟本项目作者没有任何关系。**</p>
+<h3>1.2 怎么弄一台？</h3>
+<p>任选一种（都是注册账号 → 创建机器 → 拿到 IP）：</p>
+<p>**方式 A：你已有的 VPS**（如果你本来就有一台）</p>
+<ul>
+<li>确认是 Linux（Ubuntu 22.04 / Debian 12 / CentOS 8+ 都行）</li>
+<li>最低配置：1 核 CPU / 512MB 内存 / 5GB 硬盘</li>
+</ul>
+<p>**方式 B：Oracle 云免费机**（永久免费，但注册要看运气）</p>
+<p>1. 打开 https://www.oracle.com/cloud/free/</p>
+<p>2. 点 Start for free，注册账号（要信用卡验证但不会扣钱）</p>
+<p>3. 创建实例时选「Always Free」的机器</p>
+<p>4. 记下分配的公网 IP</p>
+<p>**方式 C：fly.io 免费额度**（注册简单）</p>
+<p>1. 打开 https://fly.io</p>
+<p>2. 注册 → 安装 flyctl → `fly launch`</p>
+<p>3. 具体方法网上搜「fly.io 免费容器 教程」</p>
+<p>**方式 D：任何你能弄到的免费服务器**</p>
+<h3>1.3 拿到机器后，必须做的 3 件事</h3>
+<p>**① 确认能登录**</p>
+<p>用 SSH 工具登录你的机器（Windows 用 Termius/PuTTY，Mac 直接开终端）：</p>
+<pre class="code">
+ssh root@你的机器IP
+</pre>
+<p>输入密码后看到欢迎信息就是成功。</p>
+<p>**② 查看你的公网 IP（记下来！）**</p>
+<p>登录后输入：</p>
+<pre class="code">
+curl https://api.ipify.org
+</pre>
+<p>屏幕会显示一串数字，比如 `1.2.3.4`。**这就是你的中转机 IP，抄下来。**</p>
+<p>**③ 开放端口（很重要，不做后面全打不开）**</p>
+<p>在你的云服务商控制台里（阿里云叫「安全组」，Oracle 叫「安全列表」），</p>
+<p>添加规则，放行下面这些端口：</p>
+<table class="tbl">
+<tr><td>端口</td><td>用途</td><td>必须开吗</td></tr>
+<tr><td>**22**</td><td>SSH 登录</td><td>必须（一般默认已开）</td></tr>
+<tr><td>**80**</td><td>网页入口</td><td>必须</td></tr>
+<tr><td>**7000**</td><td>frp 通道（沙箱连回来用）</td><td>必须</td></tr>
+<tr><td>**18800**</td><td>管理台（扫码登录用）</td><td>必须</td></tr>
+<tr><td>**17800**</td><td>沙箱直连（可选）</td><td>建议开</td></tr>
+<tr><td>**18090**</td><td>1Panel 直连（可选）</td><td>建议开</td></tr>
+</table>
+<p>添加方法（以阿里云为例）：</p>
+<pre class="code">
+控制台 → 你的实例 → 安全组 → 配置规则 → 入方向 → 手动添加
+端口范围填一个，授权对象填 0.0.0.0/0，保存。
+一个端口加一条，上面表格里「必须」的都要加。
+</pre>
+<p>✅ 检查方法：加完后，在你自己的电脑浏览器输入 `http://你的中转机IP`</p>
+<p>   如果显示「无法访问」或者页面空白，都算正常（因为还没部署），</p>
+<p>   只要不是「连接被拒绝」就行。</p>
+<hr>
+<h2>第 2 部分 · 部署中转机（第②步，1 条命令）</h2>
+<h3>2.1 把项目文件弄到中转机上</h3>
+<p>**方式 A：git clone（推荐，一条命令）**</p>
+<p>登录中转机后输入：</p>
+<pre class="code">
+git clone https://github.com/Orengr/doubao.git
+cd doubao
+</pre>
+<p>看到 `done.` 或者进度条走完就是成功。</p>
+<p>**方式 B：手动下载（不会用 git 的话）**</p>
+<p>在中转机输入：</p>
+<pre class="code">
+curl -fsSL -o doubao.tar.gz https://github.com/Orengr/doubao/archive/refs/heads/main.tar.gz
+tar xzf doubao.tar.gz
+cd doubao-main
+</pre>
+<h3>2.2 填写你的信息（一份小表格）</h3>
+<p>把配置模板复制一份：</p>
+<pre class="code">
+cp config.env.example config.env
+</pre>
+<p>然后用编辑器打开它（nano 是最简单的）：</p>
+<pre class="code">
+nano config.env
+</pre>
+<p>你会看到这样的内容，**只需要改 1 个地方**：</p>
+<pre class="code">
+# 必填：你自己的中转机公网 IP
+FRPS_ADDR=          ← 在等号后面填你第 1.3 步抄下来的 IP，比如 FRPS_ADDR=1.2.3.4
+
+# 可选：域名（没有就保持空白）
+DOMAIN=
+
+# 其他保持默认
+</pre>
+<p>改完后：</p>
+<ul>
+<li>按 `Ctrl + O` 保存</li>
+<li>按 `Enter` 确认</li>
+<li>按 `Ctrl + X` 退出</li>
+</ul>
+<p>✅ 检查：输入 `cat config.env`，能看到你填的 IP 就是成功。</p>
+<h3>2.3 一键安装</h3>
+<p>输入：</p>
+<pre class="code">
+bash install.sh
+</pre>
+<p>然后**等它跑完**（1～2 分钟）。屏幕会滚很多字，最后你会看到：</p>
+<pre class="code">
+================================================
+  部署完成！
+================================================
+【中转机信息】
+  frps 地址:  1.2.3.4:7000
+  frp token:  一串字母数字
+  访问入口:   http://1.2.3.4/
+  1Panel:     http://1.2.3.4/panel/
+【下一步】
+  1. 打开豆包，新建会话，切换到【云电脑】模式
+  2. 把 /root/SANDBOX_CMDS.txt 里的内容发给它
+  ...
+</pre>
+<p>✅ **看到「部署完成！」就是成功。**</p>
+<p>**这步做了什么（看不懂没关系）**：</p>
+<p>装了 3 个东西：frps（传达室大门）、nginx（引导员）、管理台（你的控制面板）。</p>
+<hr>
+<h2>第 3 部分 · 部署豆包沙箱（第②样，让豆包干活）</h2>
+<h3>3.1 打开豆包，新建会话</h3>
+<p>1. 手机或电脑打开豆包（App 或 https://www.doubao.com 都行）</p>
+<p>2. 点「新对话」</p>
+<p>3. **必须切换到「云电脑」模式！**</p>
+<p>   怎么切：在输入框附近找到「对话」两个字旁边的箭头 ›，</p>
+<p>   点开菜单，选「工作任务 · 云电脑」。</p>
+<p>   ⚠️ **不切的话豆包只会跟你聊天，不会真的帮你干活！**</p>
+<h3>3.2 把部署指令发给豆包</h3>
+<p>中转机上有个文件存着要发给豆包的话。查看它：</p>
+<pre class="code">
+cat /root/SANDBOX_CMDS.txt
+</pre>
+<p>屏幕会显示一大段文字。**全选复制**它。</p>
+<p>回到豆包对话，粘贴，发送。</p>
+<h3>3.3 等豆包干活</h3>
+<p>豆包会自己下载、解压、启动（大约 1～3 分钟）。</p>
+<p>✅ **看到「===== 部署完成 =====」和一堆文件列表就是成功。**</p>
+<p>如果豆包说「我不能执行」，检查：</p>
+<ul>
+<li>是不是真的切到云电脑模式了？</li>
+<li>有没有把整段话发全？</li>
+</ul>
+<hr>
+<h2>第 4 部分 · 扫码登录（第③步，30 秒）</h2>
+<h3>4.1 打开管理台</h3>
+<p>在你**自己的电脑或手机浏览器**输入：</p>
+<pre class="code">
+http://你的中转机IP:18800/
+</pre>
+<p>比如 `http://1.2.3.4:18800/`</p>
+<h3>4.2 进入扫码页面</h3>
+<p>1. 点左上角 **≡**（三条横线的按钮）</p>
+<p>2. 点「扫码登录」</p>
+<p>3. 点「获取二维码 / 重新登录」按钮</p>
+<p>页面上会出现一个带豆包图标的二维码。</p>
+<h3>4.3 用豆包 App 扫码</h3>
+<p>1. 打开手机上的**豆包 App**</p>
+<p>2. 点右上角 **+** 或扫一扫功能</p>
+<p>3. 对着电脑屏幕上的二维码扫</p>
+<p>4. 手机会弹出「确认登录」→ **点确认**</p>
+<h3>4.4 看到成功</h3>
+<p>回到 18800 页面，等几秒，会变成：</p>
+<pre class="code">
+✓ 已登录（35 个 cookie）· 浏览器常驻，自动续期
+</pre>
+<p>✅ **看到这个就是成功。** 这一页先别关。</p>
+<hr>
+<h2>第 5 部分 · 系统自动干活（你不用动）</h2>
+<p>扫码成功后，系统会**自动**：</p>
+<p>1. 保存你的登录信息</p>
+<p>2. 解除保活熔断</p>
+<p>3. 通过豆包拉起沙箱里的服务</p>
+<p>4. 恢复保活循环（每 2~2.5 分钟做一个小任务保持活跃）</p>
+<p>你什么都不用做，等 1~2 分钟即可。</p>
+<hr>
+<h2>第 6 部分 · 检查一切正常（验收）</h2>
+<h3>6.1 打开导航页</h3>
+<p>浏览器输入：</p>
+<pre class="code">
+http://你的中转机IP/
+</pre>
+<h3>6.2 你应该看到这样的页面</h3>
+<pre class="code">
+M  Moin Server / DoubaoBox
+   豆包沙箱 · 免费服务器
+─────────────────────────
+● 服务运行中          已运行 X分X秒
+─────────────────────────
+主要功能
+┌──────────────┐ ┌──────────────┐
+│ ▦ 服务器面板  │ │ ⌘ 控制台     │
+└──────────────┘ └──────────────┘
+面板登录信息
+用户名  admin
+密码    123456
+沙箱状态 / 隧道 / 系统自检 ...
+</pre>
+<h3>6.3 逐项检查</h3>
+<table class="tbl">
+<tr><td>看到什么</td><td>说明</td></tr>
+<tr><td>「● 服务运行中」</td><td>✅ 正常</td></tr>
+<tr><td>面板登录信息显示 admin / 123456</td><td>✅ 正常</td></tr>
+<tr><td>系统自检里控制面 ✓</td><td>✅ 正常</td></tr>
+<tr><td>系统自检里 1Panel ✓</td><td>✅ 正常</td></tr>
+<tr><td>系统自检里 frpc ✓</td><td>✅ 正常</td></tr>
+</table>
+<h3>6.4 进入 1Panel 面板</h3>
+<p>点页面上「服务器面板」那个卡片，或者输入：</p>
+<pre class="code">
+http://你的中转机IP/panel/
+</pre>
+<p>登录：**admin / 123456**</p>
+<p>**进来后第一件事：改密码！**</p>
+<p>面板右上角头像 → 用户设置 → 修改密码。</p>
+<h3>6.5 建你的第一个网站（举例）</h3>
+<p>1Panel 里：网站 → 创建网站 → 静态网站</p>
+<p>随便填个域名或 IP，提交后上传一个 index.html</p>
+<p>然后在浏览器访问就能看到你的页面了。</p>
+<p>（具体 1Panel 用法网上搜「1Panel 教程」，跟正常面板一样用。）</p>
+<hr>
+<h2>第 7 部分 · （可选）配置域名</h2>
+<p>**没有域名完全可以正常用**（用 IP 访问）。想要好看的网址才做这步。</p>
+<p>1. 在域名商（阿里云/腾讯云/Cloudflare 等）买个域名</p>
+<p>2. 到域名管理后台，添加一条 **A 记录**：</p>
+<ul>
+<li>主机记录：`@` 或 `panel`（随便起）</li>
+<li>记录值：你的中转机 IP</li>
+</ul>
+<p>3. 等 5~10 分钟生效</p>
+<p>4. 浏览器用域名访问试试</p>
+<p>⚠️ 注意：**国内服务器（阿里云/腾讯云大陆区）域名必须备案**，</p>
+<p>不备案会被拦截。解决方案：</p>
+<ul>
+<li>用境外服务器（不用备案）</li>
+<li>或直接用 IP 访问</li>
+</ul>
+<hr>
+<h2>第 8 部分 · 日常使用与维护</h2>
+<h3>8.1 日常要做什么？</h3>
+<p>**什么都不用做。** 系统自动保活、自动续期、自动恢复。</p>
+<h3>8.2 打不开了怎么办？</h3>
+<p>按顺序检查：</p>
+<pre class="code">
+第1步：打开 http://中转机IP:18800/ 能打开吗？
+  ↓ 能打开，显示已登录 → 看 18800 页面的系统自检区块
+  ↓ 打不开 → 中转机挂了，去云服务商控制台重启机器
+
+第2步：18800 显示「需要扫码」→ 重新扫一次码（第 4 部分流程）
+
+第3步：系统自检里有 ✗ → 看是哪个组件
+  → 在豆包对话里发：「帮我运行 sh /home/user/.dsh_pend/bin/ensure.sh」
+
+第4步：还不行 → 查看状态总览
+  在中转机输入：bash bin/status.sh
+  把输出发给豆包，让它帮你排查
+</pre>
+<h3>8.3 状态总览命令（一键看全系统）</h3>
+<p>在中转机输入：</p>
+<pre class="code">
+bash bin/status.sh
+</pre>
+<p>会显示所有服务、端口、登录状态、隧道、最近日志。</p>
+<h3>8.4 自测命令（确认 88 项功能正常）</h3>
+<pre class="code">
+bash test.sh
+</pre>
+<h3>8.5 密码忘了？</h3>
+<p>1Panel 密码：在豆包对话发「帮我执行 1pctl update password 修改密码」</p>
+<p>管理台：不需要密码（只有本机能访问）</p>
+<h3>8.6 想改保活频率？</h3>
+<p>编辑中转机 `/root/keepconf.json` 或在 18800 管理台「保活控制」页调整。</p>
+<hr>
+<h2>第 9 部分 · 常见问题（大白话）</h2>
+<p>**Q1：豆包沙箱是什么？会一直免费吗？**</p>
+<p>A：豆包的云电脑功能。是否收费由字节决定，本项目无法保证。</p>
+<p>**Q2：为什么部署完过几个小时就打不开了？**</p>
+<p>A：沙箱被平台回收了（正常现象）。系统会自动恢复；如果没恢复，</p>
+<p>   在豆包对话里重新发 ensure.sh 指令即可。</p>
+<p>**Q3：为什么要扫码？不扫行吗？**</p>
+<p>A：豆包服务端要求登录。不扫就没法用。扫一次后系统会自动续期。</p>
+<p>**Q4：数据会丢吗？**</p>
+<p>A：存在 10T 持久卷的数据不会丢（沙箱重建也在）。但装在系统目录的</p>
+<p>   东西会丢，所以本项目所有东西都放持久卷。</p>
+<p>**Q5：能跑游戏/挖矿/代理吗？**</p>
+<p>A：不要。违反豆包服务条款，会被封号。</p>
+<p>**Q6：我的 IP 是固定的吗？**</p>
+<p>A：沙箱的出口 IP 每次重建会变。中转机 IP 固定。</p>
+<p>**Q7：别人能访问我的服务器吗？**</p>
+<p>A：只有知道你中转机 IP 的人能访问入口页。1Panel 有密码。</p>
+<p>   建议部署完立刻改 1Panel 密码。</p>
+<p>**Q8： 怎么彻底删除这套东西？**</p>
+<p>A：中转机：`rm -rf /root/dbp-release /root/frps.toml` 并停服务；</p>
+<p>   沙箱：删除 /home/user/.dsh_pend/ 目录即可。</p>
+<hr>
+<h2>第 10 部分 · 一页速查（打印这页就够了）</h2>
+<pre class="code">
+┌─────────────────────────────────────────────────┐
+│ 顺序  做什么            在哪里做     成功标志     │
+├─────────────────────────────────────────────────┤
+│ 1    准备中转机+开端口   云控制台    端口加好了   │
+│ 2    git clone + 填IP    中转机      config.env  │
+│ 3    bash install.sh     中转机      部署完成！   │
+│ 4    发指令给豆包         豆包App     部署完成！   │
+│ 5    扫码                浏览器18800 已登录      │
+│ 6    访问导航页           浏览器/     出现导航页   │
+│ 7    进1Panel改密码       /panel/    能登录       │
+└─────────────────────────────────────────────────┘
+
+常用地址：
+  导航页     http://中转机IP/
+  管理台     http://中转机IP:18800/
+  1Panel    http://中转机IP/panel/    admin/123456
+
+常用命令（中转机上）：
+  看状态     bash bin/status.sh
+  自测       bash test.sh
+  看日志     tail -f /root/keepalive.log
+</pre>
+<div class="top" style="margin-top:30px"><a href="/">← 返回导航页</a></div>
+</body></html>

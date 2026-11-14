@@ -598,6 +598,35 @@ else
   bad "缺成品包"
 fi
 
+# 11.13 导航页与手册页
+echo
+echo "[11.13] 导航页与手册页"
+if grep -q 'manual.html' "$ROOT/bin/dbp-ctl.py"; then
+  ok "手册页路由"
+else
+  bad "缺手册路由"
+fi
+if [ -f "$ROOT/web/manual.html" ] && grep -q '完整使用手册' "$ROOT/web/manual.html"; then
+  ok "手册页内容"
+else
+  bad "手册页内容异常"
+fi
+if grep -q '免责声明' "$ROOT/web/index.html"; then
+  ok "导航页免责声明"
+else
+  bad "导航页缺免责"
+fi
+if grep -q '使用手册' "$ROOT/web/index.html"; then
+  ok "导航页手册入口"
+else
+  bad "缺手册入口"
+fi
+# 实测 HTTP
+HT=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/manual.html" 2>/dev/null)
+[ "$HT" = "200" ] && ok "手册页 HTTP 200" || bad "手册页 $HT"
+HT=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/" 2>/dev/null)
+[ "$HT" = "200" ] && ok "导航页 HTTP 200" || bad "导航页 $HT"
+
 # ---------- 12. 汇总 ----------
 echo
 echo "================================================"

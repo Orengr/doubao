@@ -112,8 +112,11 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/panel" or p.startswith("/panel/"):
             return self._proxy_panel("GET")
 
-        if p in ("/", "/index.html"):
-            f = os.path.join(PEND, "www", "index.html")
+        # 静态页白名单（index / manual）
+        STATIC_PAGES = {"", "index.html", "manual.html"}
+        if p.lstrip("/") in STATIC_PAGES:
+            fname = p.lstrip("/") or "index.html"
+            f = os.path.join(PEND, "www", fname)
             if os.path.exists(f):
                 b = open(f, "rb").read()
                 self.send_response(200)
@@ -126,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
                 return
-            return self._send(200, {"ok": True, "msg": "dbp-ctl running"})
+            return self._send(404, {"error": "page not found"})
 
         if p == "/ping":
             return self._send(200, {"ok": True, "uptime": int(time.time() - START),

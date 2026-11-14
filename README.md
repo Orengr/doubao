@@ -1,6 +1,8 @@
 # DoubaoBox · 豆包沙箱免费服务器
 
 [![Self Test](https://img.shields.io/github/actions/workflow/status/Orengr/doubao/test.yml?branch=main&label=tests)](https://github.com/Orengr/doubao/actions)
+
+**语言 / Language**: [简体中文](README.md) | [English](docs/en/MANUAL.md)
 [![License](https://img.shields.io/badge/license-禁商用·个人学习测试-red.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
@@ -260,6 +262,20 @@ bash test.sh
 - 用最小化任务保活（本项目已内置 8 种轻量任务轮换）
 - 重要数据务必放 `/home/user/.dsh_pend/`（10T 持久卷，重建不丢）
 - 若豆包策略收紧导致额度快速消耗，请降低保活频率
+
+## ⚠️ 免责声明
+
+1. **本项目仅供个人娱乐、技术学习与测试使用**，不含任何攻击、入侵、
+   侵权或违法意图。
+2. 本项目不提供任何明示或默示的担保，使用者需自行承担使用产生的
+   全部风险与后果。
+3. 本项目依赖的第三方服务（豆包 / 字节跳动）的所有规则、额度与政策
+   由其官方制定，本项目无法控制。使用前请阅读并遵守其服务条款。
+4. 使用者应确保自己的使用行为符合所在地法律法规。**因违规使用导致的
+   一切责任由使用者本人承担，与本项目作者无关。**
+5. 如本项目内容涉及您的合法权益（包括但不限于著作权、商标权），
+   请通过 Issue 联系，我们将在确认后 24 小时内处理（删除或修改）。
+6. **禁止将本项目用于任何商业用途或违法活动**，详见 [LICENSE](LICENSE)。
 
 ## 许可
 

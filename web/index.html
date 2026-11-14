@@ -64,6 +64,11 @@ padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
 .mono{font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px;
 background:var(--card2);padding:3px 8px;border-radius:6px;cursor:pointer}
 .copy-hint{font-size:11px;color:var(--dim);margin-top:8px;text-align:center}
+.disclaimer{background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:14px 16px;margin-top:24px}
+.d-title{font-size:12.5px;font-weight:700;color:var(--warn);margin-bottom:6px}
+.d-text{font-size:11px;color:var(--dim);line-height:1.7}
+
 .foot{text-align:center;font-size:11.5px;color:var(--dim);margin-top:28px;line-height:1.8}
 </style></head>
 <body><div class="wrap">
@@ -103,6 +108,11 @@ border:1px solid rgba(255,92,124,.35);border-radius:14px;padding:16px;margin-bot
     <div class="t">控制台</div>
     <div class="d">扫码登录 / 保活 / 沙箱控制</div>
   </a>
+  <a class="tile" href="/manual.html">
+    <div class="ico">📖</div>
+    <div class="t">使用手册</div>
+    <div class="d">大白话全流程 · 小白也能看懂</div>
+  </a>
 </div>
 
 <div class="sec">面板登录信息</div>
@@ -132,6 +142,13 @@ border:1px solid rgba(255,92,124,.35);border-radius:14px;padding:16px;margin-bot
 <div class="sec">系统自检</div>
 <div class="info" id="healthBox">
   <div class="row"><span class="k">加载中…</span><span class="v">—</span></div>
+</div>
+
+<div class="disclaimer">
+  <div class="d-title">⚠️ 免责声明</div>
+  <div class="d-text">本项目仅供个人娱乐、技术学习与测试，不含任何攻击或侵权意图。<br>
+  使用产生的全部风险与后果由使用者自行承担。<br>
+  如有侵权请联系删除。详见项目 LICENSE。</div>
 </div>
 
 <div class="foot">
