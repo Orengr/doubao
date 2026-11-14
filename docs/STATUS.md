@@ -444,6 +444,41 @@ README 加 shields.io 徽章组（CI / License / Python / 零依赖 / 测试 89 
 
 **6. 自测 89 项（含 6 项脱敏/开箱即用检查）**
 
+### Round 18 新增（重大）
+
+**1. GitHub Release 上线（解决下载波动问题）**
+
+用户提供了 token，已创建 Release v2.0 并上传 58.5MB 成品包。
+
+**实测对比：**
+```
+raw 通道:   58MB 只下到 47MB/58MB（波动截断）❌
+Release:    2 次全量 61,327,680B，1.6 MB/s 稳定 ✓
+```
+
+**下载源三级回退：**
+```
+1. GitHub Release（CDN，稳定）    ← 首选
+2. raw bt_res（仓库）             ← 回退
+3. raw pkg.tar.gz（纯脚本）       ← 兜底
+```
+
+**2. 修复 install.sh 两个真实 bug**
+- `pkill` 无匹配在 set -e 下导致脚本中断（加了 `|| true`）
+- frps 版本号读取失败显示 `?`（改用 grep 提取）
+
+**3. 修复重跑覆盖 token 缺陷**
+重跑 install.sh 会重置 frps token，导致已连接沙箱断线。
+现已检测已有配置并保留原 token。
+
+**4. 无 systemd 容器兼容**
+检测 systemd 可用性，不可用时用 nohup 直接启动。
+
+**5. Release URL**
+```
+https://github.com/Orengr/doubao/releases/download/v2.0/doubao-bundle.tar.gz
+```
+
 ## 未验证项
 
 以下因登录失效未能实测，但逻辑已通过语法检查：

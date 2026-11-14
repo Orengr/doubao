@@ -319,6 +319,7 @@ import sys
 addr, token, ctl, panel = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 puser, ppass = sys.argv[5], sys.argv[6]
 raw = sys.argv[7]
+rel = "https://github.com/Orengr/doubao/releases/download/v2.0/doubao-bundle.tar.gz"
 
 inner = f"""#!/bin/bash
 # 豆包沙箱 · 成品包一步部署（下载解压即用，零公网安装）
@@ -340,6 +341,7 @@ dl() {{
   done
   return 1
 }}
+dl "https://github.com/Orengr/doubao/releases/download/v2.0/doubao-bundle.tar.gz" bundle.tar.gz 50000000 || \
 dl "{raw}/bt_res/doubao-bundle.tar.gz" bundle.tar.gz 50000000 || \
 dl "{raw}/pkg.tar.gz" bundle.tar.gz 10000 || {{
   echo "成品包下载失败，请检查 GitHub 地址"; exit 1
