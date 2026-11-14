@@ -75,26 +75,35 @@ def qr_check():
     st = str(d.get("data", {}).get("status", ""))
     out = {"status_code": st, "raw": json.dumps(d)[:200]}
     if st in ("5", "new"):
-        # 成功: 从 Set-Cookie 收集
-        setcks = headers.get_all("Set-Cookie") or []
-        pairs = []
-        for sc in setcks:
-            c = SimpleCookie()
-            try:
-                c.load(sc)
-                for k, morsel in c.items():
-                    pairs.append(f"{k}={morsel.value}")
-            except Exception: pass
+        # 成功: cookie jar 跟随 passport 跳转，收全 session cookie
+        import http.cookiejar
+        cj = http.cookiejar.CookieJar()
+        op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        op.addheaders = [("User-Agent", UA), ("Referer", "https://www.doubao.com/")]
+        try:
+            op.open(f"{BASE_ACC}/passport/web/check_qrconnect/?next=https%3A%2F%2Fwww.doubao.com&token={tok}&{Q_ACC}", timeout=20)
+            op.open("https://www.doubao.com/chat/", timeout=25)
+        except Exception:
+            pass
+        pairs = [f"{c.name}={c.value}" for c in cj if c.value]
+        if not pairs:
+            setcks = headers.get_all("Set-Cookie") or []
+            for sc in setcks:
+                cc = SimpleCookie()
+                try:
+                    cc.load(sc)
+                    for k, morsel in cc.items(): pairs.append(f"{k}={morsel.value}")
+                except Exception: pass
         if pairs:
-            txt = ";\n".join(pairs)
+            txt = "\n".join(pairs)
             bak = f"/root/ck_backups/ck_{time.strftime('%Y%m%d_%H%M%S')}.txt"
             os.makedirs("/root/ck_backups", exist_ok=True)
             try: open(bak,"w").write(txt)
             except Exception: pass
             open(CK, "w").write(txt)
             out["saved_cookies"] = len(pairs)
-            out["login"] = True
-            log.info(f"QR 登录成功，保存 {len(pairs)} 个 cookie")
+            out["login"] = len(pairs) >= 10
+            log.info(f"QR 登录完成，收集 {len(pairs)} 个 cookie")
     return out
 
 def cookie_alive():
