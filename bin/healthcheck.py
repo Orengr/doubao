@@ -12,14 +12,24 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-CONF = "/root/healthconf.json"
-STATE = "/root/health_state.json"
-LOG = "/root/healthcheck.log"
+CONF = os.environ.get("HEALTHCONF", "/root/healthconf.json")
+STATE = os.environ.get("HEALTH_STATE", "/root/health_state.json")
+LOG = os.environ.get("HEALTH_LOG", "/root/healthcheck.log")
 
-logging.basicConfig(level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler(LOG, encoding="utf-8"), logging.StreamHandler()])
+# 延迟初始化 logging：模块被 import 时（如测试环境）不写文件
 log = logging.getLogger("hc")
+log.setLevel(logging.INFO)
+if not log.handlers:
+    try:
+        _fh = logging.FileHandler(LOG, encoding="utf-8")
+        _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        log.addHandler(_fh)
+        log.addHandler(logging.StreamHandler())
+    except (PermissionError, OSError):
+        # 无权限写日志（如 CI/测试环境）→ 只输出到 stdout
+        logging.basicConfig(level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s")
+        log = logging.getLogger("hc")
 
 # 关键 cookie（兼容新旧两套体系）
 # 新体系：sessionid_ss / sid_guard / uid_tt_ss / sid_ucp_v1
