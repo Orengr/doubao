@@ -640,6 +640,11 @@ if grep -q "AUTODEPLOY.md" "$ROOT/README.md"; then
 else
   bad "README 缺入口"
 fi
+if grep -q "sshpass" "$ROOT/AUTODEPLOY.md" && grep -q "relay_ssh.txt" "$ROOT/AUTODEPLOY.md"; then
+  ok "SSH 自动装中转机流程"
+else
+  bad "缺 SSH 自动安装流程"
+fi
 
 # ---------- 12. 汇总 ----------
 echo
