@@ -627,6 +627,20 @@ HT=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/manual.
 HT=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/" 2>/dev/null)
 [ "$HT" = "200" ] && ok "导航页 HTTP 200" || bad "导航页 $HT"
 
+# 11.14 自动部署总控
+echo
+echo "[11.14] 自动部署总控"
+if [ -f "$ROOT/AUTODEPLOY.md" ] && grep -q "第 1 步" "$ROOT/AUTODEPLOY.md" && grep -q "安全红线" "$ROOT/AUTODEPLOY.md"; then
+  ok "AUTODEPLOY.md 完整"
+else
+  bad "AUTODEPLOY.md 缺失/不完整"
+fi
+if grep -q "AUTODEPLOY.md" "$ROOT/README.md"; then
+  ok "README 最简用法入口"
+else
+  bad "README 缺入口"
+fi
+
 # ---------- 12. 汇总 ----------
 echo
 echo "================================================"

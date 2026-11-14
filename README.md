@@ -11,6 +11,19 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Orengr/doubao/pulls)
 [![Self Test](https://img.shields.io/badge/self%20test-88%20passed-success.svg)](test.sh)
 
+## 🚀 最简用法（发给豆包的一句话）
+
+把下面这句发给豆包（云电脑模式），它会自动读步骤、自动部署、
+只问你要「中转机 IP」这一个信息：
+
+```
+请读取 https://raw.githubusercontent.com/Orengr/doubao/main/AUTODEPLOY.md 并按它执行全自动部署
+```
+
+> 想自己一步步来？看 [完整手册](docs/MANUAL.md)。
+
+---
+
 在豆包沙箱里跑出一个**带 1Panel 面板的免费服务器**，数据存在 10T 持久卷，沙箱重建后自动恢复。
 
 > 本项目基于 `Orengr/doubao-bt-deploy` 重构。原版用宝塔 + 编译 PHP/MySQL，安装耗时长、额度容易耗尽。本版改用 **1Panel（Go 单二进制，2 分钟装完）**，并加入自动保活与自愈机制。
