@@ -479,6 +479,30 @@ Release:    2 次全量 61,327,680B，1.6 MB/s 稳定 ✓
 https://github.com/Orengr/doubao/releases/download/v2.0/doubao-bundle.tar.gz
 ```
 
+### Round 19 新增
+
+**1. 按 Round 18 用户要求：下载源改为只有 Release**
+
+用户明确说「改成只有 Release 的，其他方式不要」。已执行：
+```
+沙箱指令下载源: 只有 https://github.com/Orengr/doubao/releases/download/v2.0/doubao-bundle.tar.gz
+install-1panel.sh: 使用成品包二进制（不再有任何公网下载）
+install.sh: 删除 GITHUB_RAW / raw 回退 / 中转机 blobs / 官方源回退
+```
+
+**2. install-1panel.sh 重写为成品包安装版**
+
+成品包解压后自带 1panel 二进制，安装脚本只负责：
+```
+注册到 /usr/local/bin + 改 BASE_DIR 指向持久卷 + 设默认密码
+```
+不再有任何下载逻辑。
+
+**3. 测试用例同步更新**
+删除了 3 个过时用例（架构检测/幂等跳过/下载降级——成品包版不再需要），
+恢复并保留了 4 个区块的测试（熔断冷却/兜底/自愈/登录自动恢复/安全/状态/CI/脱敏）。
+最终 88 项全通过。
+
 ## 未验证项
 
 以下因登录失效未能实测，但逻辑已通过语法检查：

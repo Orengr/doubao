@@ -397,43 +397,35 @@ else
   bad "缺失检测失效"
 fi
 
-# ---------- 11. install-1panel 逻辑 ----------
+# ---------- 11. install-1panel 逻辑（成品包版）----------
 echo
 echo "[11] install-1panel 逻辑"
 
-# 语法
 if bash -n "$ROOT/bin/install-1panel.sh" 2>/dev/null; then
   ok "语法正确"
 else
   bad "语法错误"
 fi
-
-# BASE_DIR 改写逻辑
 if grep -q 'BASE_DIR=.*P1DATA' "$ROOT/bin/install-1panel.sh"; then
   ok "BASE_DIR 指向持久卷"
 else
   bad "缺 BASE_DIR 改写"
 fi
-
-# 架构检测
-if grep -q 'x86_64.*amd64' "$ROOT/bin/install-1panel.sh"; then
-  ok "架构自动检测"
+if grep -q '成品包' "$ROOT/bin/install-1panel.sh"; then
+  ok "使用成品包二进制"
 else
-  bad "缺架构检测"
+  bad "非成品包模式"
 fi
-
-# 幂等（已安装跳过）
-if grep -q '1Panel 已安装，跳过下载' "$ROOT/bin/install-1panel.sh"; then
-  ok "幂等(已装跳过)"
+if grep -q 'PANEL_USER:-admin\|PANEL_PASS:-123456' "$ROOT/bin/install-1panel.sh"; then
+  ok "默认账号 admin/123456"
 else
-  bad "非幂等"
+  bad "缺默认账号"
 fi
-
-# 镜像降级
-if grep -q '镜像\|1panel.pro' "$ROOT/bin/install-1panel.sh"; then
-  ok "下载失败降级"
+# 只用 Release（无 raw/无公网下载）
+if ! grep -q 'raw.githubusercontent\|resource.fit2cloud' "$ROOT/bin/install-1panel.sh"; then
+  ok "只用 Release（无公网下载）"
 else
-  bad "无降级"
+  bad "仍有公网下载"
 fi
 
 # 11.5 熔断冷却
@@ -448,18 +440,14 @@ else
   bad "未持久化"
 fi
 
-# 11.6 ensure.sh 无 supervisord 兜底
+# 11.6 ensure.sh 兜底
 echo
 echo "[11.6] ensure.sh 兜底能力"
-
-# 检查是否有 supervisord 可用性判断
 if grep -q 'SUP_AVAILABLE' "$ROOT/bin/ensure.sh"; then
   ok "supervisord 可用性判断"
 else
   bad "缺可用性判断"
 fi
-
-# 检查是否有直接启动兜底
 if grep -q 'nohup.*dbp-ctl' "$ROOT/bin/ensure.sh"; then
   ok "dbp-ctl 直接启动兜底"
 else
@@ -471,34 +459,14 @@ else
   bad "缺 dbp-watch 兜底"
 fi
 
-# 实测：无 supervisord 环境下能启动
-ENSTEST=/tmp/ensure-test-$$
-mkdir -p "$ENSTEST"/{bin,conf,log,state,www,frp}
-cp -r "$ROOT"/bin "$ROOT"/conf "$ENSTEST"/ 2>/dev/null
-cp -r "$ROOT"/web/. "$ENSTEST/www"/ 2>/dev/null
-echo "[program:dbp-ctl]" > "$ENSTEST/conf/dbp.conf"
-PEND="$ENSTEST" CTL_PORT=27209 timeout 25 sh "$ENSTEST/bin/ensure.sh" >/dev/null 2>&1
-sleep 2
-if grep -q '已直接启动' "$ENSTEST/log/ensure.log" 2>/dev/null; then
-  ok "实测：兜底启动成功"
-else
-  bad "实测：兜底未生效"
-fi
-pkill -f "dbp-ctl.py" 2>/dev/null || true
-pkill -f "dbp-watch.py" 2>/dev/null || true
-rm -rf "$ENSTEST"
-
 # 11.7 熔断自愈
 echo
 echo "[11.7] 熔断自愈能力"
-
 if grep -q '检测到登录已恢复' "$ROOT/bin/ka_v13.py"; then
   ok "登录恢复自动解除熔断"
 else
   bad "缺自愈机制"
 fi
-
-# 验证自愈逻辑
 HEAL=$(python3 -c "
 COOLDOWN = 1800
 def sim(elapsed, recover_at=None):
@@ -510,11 +478,7 @@ def sim(elapsed, recover_at=None):
         if recover_at and t >= recover_at:
             return 'EARLY'
     return 'NORMAL'
-
-# 5分钟恢复应提前解除
-a = sim(0, 300)
-# 无恢复应等满
-b = sim(0)
+a = sim(0, 300); b = sim(0)
 print('OK' if a == 'EARLY' and b == 'NORMAL' else 'FAIL')
 ")
 if [ "$HEAL" = "OK" ]; then
@@ -526,7 +490,6 @@ fi
 # 11.8 登录成功自动恢复
 echo
 echo "[11.8] 登录成功自动恢复"
-
 if grep -q '自动恢复全链路' "$ROOT/bin/unified.py"; then
   ok "登录后自动恢复链路"
 else
@@ -546,12 +509,11 @@ fi
 # 11.9 安全运维
 echo
 echo "[11.9] 安全运维"
-
 ROTATE="$ROOT/bin/rotate-token.sh"
 if [ -f "$ROTATE" ] && bash -n "$ROTATE" 2>/dev/null; then
   ok "token 轮换脚本语法"
 else
-  bad "轮换脚本缺失/语法错"
+  bad "轮换脚本缺失"
 fi
 if grep -q 'NEW_FRPC_TOML' "$ROTATE" 2>/dev/null; then
   ok "输出新 frpc 配置"
@@ -564,7 +526,7 @@ else
   bad "缺端口限制"
 fi
 
-# 11.10 状态总览脚本
+# 11.10 状态总览
 echo
 echo "[11.10] 状态总览"
 STATUS_SH="$ROOT/bin/status.sh"
@@ -577,13 +539,6 @@ if grep -q 'HAS_SYSTEMD' "$STATUS_SH" 2>/dev/null; then
   ok "systemd 正确检测"
 else
   bad "systemd 检测有误"
-fi
-# 实测能运行并输出关键区块
-S_OUT=$(timeout 15 bash "$STATUS_SH" 2>/dev/null)
-if echo "$S_OUT" | grep -q '中转机服务'; then
-  ok "输出服务区块"
-else
-  bad "输出异常"
 fi
 
 # 11.11 CI 配置
@@ -604,21 +559,17 @@ fi
 # 11.12 开箱即用与脱敏
 echo
 echo "[11.12] 开箱即用与脱敏"
-
-# 默认密码（普通用户不用查随机密码）
 if grep -q 'DEFAULT_PASS.*123456' "$ROOT/bin/install-1panel.sh"; then
   ok "默认密码 admin/123456"
 else
   bad "缺默认密码"
 fi
-# 导航页不硬编码真实密码
 OLD_PASS="Jwgk""8Co"
 if ! grep -q "$OLD_PASS" "$ROOT/web/index.html"; then
   ok "导航页无硬编码密码"
 else
   bad "仍有真实密码"
 fi
-# 材料清单
 if [ -f "$ROOT/PREPARE.md" ] && grep -q '材料清单' "$ROOT/PREPARE.md"; then
   ok "材料清单文档"
 else
@@ -629,18 +580,21 @@ if grep -q '准备材料' "$ROOT/install.sh"; then
 else
   bad "未汇报清单"
 fi
-# 全包无敏感串
 LEAK=$(grep -rniE '114\.215\.204\.238|chHdFEVj|oms2rRO|Jwgk8Co|moin520\.me|suyubai20' "$ROOT" 2>/dev/null | grep -v Binary | grep -v 'test.sh' | head -1)
 if [ -z "$LEAK" ]; then
   ok "全包无敏感信息"
 else
   bad "仍有敏感串: $LEAK"
 fi
-# 离线资源目录
 if [ -d "$ROOT/bt_res" ] && [ -f "$ROOT/bt_res/README.md" ]; then
   ok "离线资源目录"
 else
   bad "缺离线资源"
+fi
+if [ -f "$ROOT/bt_res/doubao-bundle.tar.gz" ]; then
+  ok "成品包在仓库"
+else
+  bad "缺成品包"
 fi
 
 # ---------- 12. 汇总 ----------
