@@ -1,12 +1,12 @@
 # 豆包免费服务器 · 一键部署
 
-[![Self Test](https://img.shields.io/github/actions/workflow/status/Orengr/doubao-free-server/test.yml?branch=main&label=tests)](https://github.com/Orengr/doubao-free-server/actions)
+[![Self Test](https://img.shields.io/github/actions/workflow/status/Orengr/doubao/test.yml?branch=main&label=tests)](https://github.com/Orengr/doubao/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](docs/STATUS.md)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Orengr/doubao-free-server/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Orengr/doubao/pulls)
 [![Self Test: 89 Passed](https://img.shields.io/badge/self%20test-89%20passed-success.svg)](test.sh)
 
 > 徽标是 README 里的 shields.io 图片链接（作者自己写的，不是 GitHub 发的），

@@ -27,7 +27,7 @@ fi
 FRPS_ADDR="${FRPS_ADDR:-}"
 FRPS_TOKEN="${FRPS_TOKEN:-}"
 # 组件/二进制统一从 GitHub 拉取（用户 clone 即用，不依赖中转机预置）
-GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/Orengr/doubao-free-server/main}"
+GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/Orengr/doubao/main}"
 PANEL_PORT="${PANEL_PORT:-18090}"
 CTL_PORT="${CTL_PORT:-17800}"
 WEB_PORT="${WEB_PORT:-18800}"

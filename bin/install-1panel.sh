@@ -26,7 +26,7 @@ if command -v 1pctl >/dev/null 2>&1 && [ -x /usr/local/bin/1panel ]; then
 else
   URL="https://resource.fit2cloud.com/1panel/package/stable/${VERSION}/release/1panel-${VERSION}-linux-${A}.tar.gz"
   # 优先从项目 GitHub 仓库的 bt_res 拉（用户 clone 后自带，零额外下载）
-  GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/Orengr/doubao-free-server/main}"
+  GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/Orengr/doubao/main}"
   cd /tmp
   echo "下载: $GITHUB_RAW/bt_res/1panel.tar.gz"
   curl -fsSL --max-time 180 -o 1p.tar.gz "$GITHUB_RAW/bt_res/1panel.tar.gz" || {
