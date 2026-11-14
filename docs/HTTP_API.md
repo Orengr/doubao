@@ -98,3 +98,63 @@ body 结构（抓包实测完整模板）：
 ├── keepalive:   轮换任务发到目标会话（复用 v13 熔断/冷却逻辑）
 └── tunnel_probe: 不变（检查 17800/18090）
 ```
+
+
+---
+
+## 五、短信登录接口（2026-11-14 实测）
+
+### 1. 发送验证码 POST accounts.doubao.com/passport/web/send_code/
+
+**手机号混淆算法（实测破解）**：
+```
+plain = "+86 " + 手机号          （注意 86 后有一个空格）
+enc   = hex( bytes(plain).each_byte ^ 0x05 )
+例：15888888888 → "+86 15888888888" → "2e3d332534303d3d3d3d3d3d3d3d3d"
+验证：bytes("2e3d33...".hex_decode) ^ 0x05 == b"+86 15888888888"
+```
+
+**POST body（x-www-form-urlencoded）**：
+```
+mix_mode=1&mobile=<混淆hex>&type=3731&is6Digits=1&fixed_mix_mode=1
+```
+
+**URL query（关键参数）**：
+```
+passport_jssdk_version=4.4.6&passport_jssdk_type=normal&is_from_ttaccountsdk=1
+&aid=497858&language=zh&ts=<unix秒>&p_ca=4.0.26&fp=<verify_fp>&verifyFp=<verify_fp>
+&multi_login=1&account_sdk_source=web
+```
+
+响应成功后页面显示「验证码已发送至 +86 xxx」。
+
+### 2. 提交验证码（待补全）
+验证码输入框为 6 格 div 模拟，无法直接抓到 input 提交请求。
+字节 passport 标准提交端点为 `/passport/web/msVerify/` 或 `/passport/web/login/`
+（带 code/mobile 混淆参数）——待真实手机号触发后补录。
+
+**当前登录方案**：
+- 方案A（已打通）：扫码 → unified 页面
+- 方案B（半打通）：send_code 已可真实发短信，提交接口待补
+- 方案C（规划）：`/passport/web/auth/get_oauth_token/` 在未登录时也被调用，
+  可能支持匿名换 token，待研究
+
+### 3. 用户界面重做规划（v3 unified-lite）
+
+```
+18800 新页面（纯 HTTP，无浏览器）：
+┌────────────────────────────────┐
+│  登录区                        │
+│  [手机号输入] [发送验证码]      │
+│  [验证码输入] [登录]            │
+│  ── 或 ──                      │
+│  [显示二维码] (扫码兜底)        │
+├────────────────────────────────┤
+│  状态区: cookie活性/隧道/会话   │
+│  保活控制: 启动/停止/目标会话   │
+└────────────────────────────────┘
+后端：unified_lite.py（Flask-free，http.server）
+     登录代理 → passport 接口
+     保活引擎 → ka_http.py
+     旧 ka_v13/unified 浏览器版 → 废弃
+```
