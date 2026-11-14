@@ -26,3 +26,4 @@ SANDBOX_CMDS.txt
 # 例外：离线资源包必须随仓库分发（成品包）
 !bt_res/
 !bt_res/*.tar.gz
+!pkg.tar.gz
