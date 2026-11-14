@@ -206,6 +206,21 @@ server {
     listen 80 default_server;
     server_name _;
 
+    location /lite/ {
+        proxy_pass http://127.0.0.1:${WEB_PORT}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header Connection "";
+        proxy_read_timeout 300s;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:${WEB_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_read_timeout 300s;
+    }
+
     location /panel/ {
         proxy_pass http://127.0.0.1:${PANEL_PORT}/;
         proxy_http_version 1.1;
