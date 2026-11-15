@@ -199,3 +199,52 @@ POST /passport/web/sms_login/    验证码登录（XOR混淆手机号+验证码�
 GET  /passport/web/get_qrcode/   QR 拉取
 GET  /passport/web/check_qrconnect/  QR 状态轮询
 ```
+
+
+---
+
+## 七、短信全自动登录打通（2026-11-15 08:26 实测成功）
+
+### 完整流程（全部纯接口+浏览器UI混合）
+
+```
+1. 前置: 访问 doubao.com/chat 拿 base cookie
+2. 前置: 访问 passport/web/login 拿 csrf
+3. 发码: POST /passport/web/send_code/（手机号XOR 0x05混淆，type=3731）
+4. 用户收码 → 提交: POST /passport/web/sms_login/（手机号+验证码都XOR混淆）
+5. 收集响应全部 Set-Cookie（含 sessionid/sid_guard，TTL 6h-30d）
+6. 活性验证: recent_conv 返回 status_code=0 + uid
+```
+
+**实测结果（08:26）**：
+```
+sid_guard 签发: 2026-11-15 08:26:42 | TTL 720h
+sessionid + sessionid_ss 全拿到
+活性: status_code=0 | uid=2328113677082323（主账号）
+```
+
+### 实现脚本
+- `sms_auto.py`：全自动（登录+等码+提交+存cookie），轮询 `/root/sms_code.txt`
+- `direct_sms.py`：纯HTTP发码
+- `flow_sms.py`：带csrf前置的完整流
+- `verify_deploy.py`：session 活性验证+部署
+
+### 关键错误码对照
+```
+0     成功
+7     访问太频繁（IP限频，等冷却或换浏览器流程）
+1203  验证码过期/错误次数过多
+1206  验证码发送太频繁
+712012001 session 已过期
+712012002 不支持编码类型（Content-Type 缺 encoding=utf-8）
+710020202 completion 参数错误（缺/错 a_bogus）
+710020702 completion 系统错误（is_replay=true → 签名被判重放）
+710022002 completion 访问频繁
+```
+
+### chat/completion 签名难关（当前未破）
+```
+需要 query 参数 a_bogus（新版），浏览器内 bdms.frontierSign 只生成
+旧版 X-Bogus header。GitHub 公开的 a_bogus Python 实现是抖音版本，
+与豆包版本参数顺序/密钥有差异 → 签名被拒（invalid param）
+```
