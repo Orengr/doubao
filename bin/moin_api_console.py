@@ -207,7 +207,7 @@ function fmtSz(b){if(!b)return"0";var u=["B","K","M","G","T"],i=0;while(b>=1024&
 function barCls(p){p=parseFloat(p)||0;return p>85?"err":(p>70?"warn":"")}
 async function api(p,opt){var r=await fetch(p,opt);var t=await r.text();try{return JSON.parse(t)}catch(e){return t}}
 function toggleMenu(){document.body.classList.toggle('menu')}
-function renderNav(){var g="",h="";NAV.forEach(function(x){if(x[3]!==g){g=x[3];h+='<div class="grp">'+g+'</div>'}h+='<a class="'+(x[0]===cur?'on':'')+'" onclick="go(\\''+x[0]+'\\')"><span class="i">'+x[2]+'</span>'+x[1]+'</a>'});document.getElementById('nav').innerHTML=h}
+function renderNav(){var g="",h="";NAV.forEach(function(x){if(x[3]!==g){g=x[3];h+='<div class="grp">'+g+'</div>'}h+='<a class="'+(x[0]===cur?'on':'')+'" data-k="'+x[0]+'"><span class="i">'+x[2]+'</span>'+x[1]+'</a>'});var n=document.getElementById('nav');n.innerHTML=h;n.querySelectorAll('a[data-k]').forEach(function(a){a.onclick=function(){go(a.getAttribute('data-k'))}})}
 function go(k){cur=k;var t=NAV.filter(function(x){return x[0]===k})[0];document.getElementById('pageTitle').textContent=t?t[1]:k;renderNav();document.body.classList.remove('menu');load()}
 function setLive(ok){var d=document.getElementById('liveDot');d.className='dot'+(ok?'':' err');document.getElementById('liveTxt').textContent=ok?'实时':'断开'}
 async function load(){
@@ -223,7 +223,7 @@ async function load(){
     else if(cur==='cron'){S.cr=await api('/api/panel/cron');v.innerHTML=cronHTML(S.cr)}
     else if(cur==='backup'){v.innerHTML=backupHTML()}
     else if(cur==='ftp'){v.innerHTML=ftpHTML()}
-    else if(cur==='terminal'){v.innerHTML=termHTML()}
+    else if(cur==='terminal'){v.innerHTML=termHTML();bindTerm()}
   }catch(e){v.innerHTML='<div class="card err">加载失败: '+esc(e.message)+'</div>'}
 }
 function ring(p,label){
@@ -264,10 +264,12 @@ async function files(p){
   var d=await api('/api/panel/ls?p='+encodeURIComponent(p||''));
   var up=p?d.path.split('/').slice(0,-1).join('/'):'';
   document.getElementById('view').innerHTML=
-   '<div class="toolbar"><input id="fp" value="'+esc(d.path)+'"><button class="sm" onclick="files(document.getElementById(\\'fp\\').value)">打开</button></div>'
-   +'<div class="card">'+(p?'<div class="fitem" onclick="files(\\''+esc(up)+'\\')"><div class="ico">↑</div><div class="nm">.. 上级目录</div></div>':'')
+   '<div class="toolbar"><input id="fp" value="'+esc(d.path)+'"><button class="sm" id="fpGo">打开</button></div>'
+   +'<div class="card">'+(p?'<div class="fitem" data-p="'+esc(up)+'"><div class="ico">↑</div><div class="nm">.. 上级目录</div></div>':'')
    +d.items.map(function(i){var full=d.path.replace(/\/$/,'')+'/'+i.name;return '<div class="fitem" onclick="'+(i.dir?'files('+JSON.stringify(full)+')':'openFile('+JSON.stringify(full)+')')+'"><div class="ico">'+(i.dir?'▸':'▤')+'</div><div class="nm">'+esc(i.name)+'</div><div class="sz">'+(i.dir?'':fmtSz(i.size))+'</div></div>'}).join('')
    +'</div><pre id="fileview" class="hide"></pre>';
+  var gb=document.getElementById('fpGo'); if(gb) gb.onclick=function(){files(document.getElementById('fp').value)};
+  document.querySelectorAll('.fitem[data-p]').forEach(function(el){el.onclick=function(){files(el.getAttribute('data-p'))}});
 }
 async function openFile(p){var c=await api('/api/panel/read?p='+encodeURIComponent(p));var el=document.getElementById('fileview');el.classList.remove('hide');el.textContent=c;el.scrollIntoView({behavior:'smooth'})}
 function sitesHTML(s){
@@ -310,7 +312,12 @@ function ftpHTML(){
    +'<h2>说明</h2><div class="card dim" style="font-size:12.5px">FTP 需额外端口，当前通过 frp 仅暴露 80；如需 FTP 请在面板「容器应用」中启动 ftp server 并加隧道。</div>';
 }
 function termHTML(){
-  return '<h2>终端（沙箱内执行）</h2><div class="card"><textarea id="cmd" rows="3" placeholder="输入命令，如 df -h"></textarea><div style="margin-top:9px;display:flex;gap:8px"><button onclick="runCmd()">执行</button><button class="sec" onclick="document.getElementById(\\'cout2\\').textContent=\\'\\'">清屏</button></div></div><pre id="cout2">就绪</pre>';
+  return '<h2>终端（沙箱内执行）</h2><div class="card"><textarea id="cmd" rows="3" placeholder="输入命令，如 df -h"></textarea><div style="margin-top:9px;display:flex;gap:8px"><button id="cmdRun">执行</button><button class="sec" id="cmdClear">清屏</button></div></div><pre id="cout2">就绪</pre>';
+}
+function bindTerm(){
+  var r=document.getElementById('cmdRun'), c=document.getElementById('cmdClear');
+  if(r) r.onclick=runCmd;
+  if(c) c.onclick=function(){document.getElementById('cout2').textContent=''};
 }
 async function runCmd(){var c=document.getElementById('cmd').value;if(!c.trim())return;var el=document.getElementById('cout2');el.textContent='执行中…';try{var r=await api('/api/panel/sh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:c})});el.textContent='$ '+c+'\n'+(r.out||'')+'\n[rc='+r.rc+']'}catch(e){el.textContent='失败: '+e.message}}
 // ===== 实时更新（3 秒轮询 + 差值动画，无需刷新）=====
@@ -352,9 +359,12 @@ function startLive(){
 }
 async function boot(){
   renderNav();
+  document.getElementById('view').innerHTML='<div class="card dim">连接中…</div>';
   try{var p=await api('/api/panel/ping');document.getElementById('hostSm').textContent=(p.host||'').replace(/^vefaas-/,'').split('-')[0]||'沙箱'}catch(e){}
-  load();startLive();
+  try{ await load(); }catch(e){ document.getElementById('view').innerHTML='<div class="card err">加载失败: '+esc(e.message)+'<br><br><button class="sec sm" onclick="location.reload(true)">强制刷新</button></div>'; }
+  startLive();
 }
+window.addEventListener('error',function(ev){var v=document.getElementById('view');if(v&&v.innerHTML.indexOf('加载中')>=0){v.innerHTML='<div class="card err">JS 错误: '+esc(ev.message)+'<br><br><button class="sec sm" onclick="location.reload(true)">强制刷新</button></div>'}});
 boot();
 </script></body></html>"""
 
