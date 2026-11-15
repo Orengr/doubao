@@ -34,6 +34,19 @@ def sessions_with_status():
     out.sort(key=lambda x:(not x["keep"], x["name"]))
     return out
 
+PANEL_TOKEN = "oms2rROVaDd8t8s9jWIYKBW1eYREoQbu"
+PANEL_FALLBACK = "/cSK41ajJX5"
+
+def panel_entrance():
+    # 从沙箱持久卷读入口（控制面 /get 带 token）；失败回退缓存值
+    try:
+        url = "http://127.0.0.1:17800/get?token=" + PANEL_TOKEN + "&p=/home/user/.dsh_pend/state/panel_entrance.txt"
+        r = urllib.request.urlopen(url, timeout=8)
+        e = r.read().decode("utf-8","ignore").strip()
+        if e.startswith("/") and len(e) < 40: return e
+    except Exception: pass
+    return PANEL_FALLBACK
+
 def status():
     st=KEEP.status(); ss=sessions_with_status(); st["sessions"]=ss
     # 防假登录：会话列表读不出来（ERR/空）就视为未登录
@@ -47,6 +60,7 @@ def status():
         hit=next((x for x in ss if x["id"]==k), None)
         if hit: st["account"]["keep_conv_name"]=hit["name"]
     if uid(): st["settings"]=DB.all_settings(uid())
+    st["panel_entrance"] = panel_entrance()
     return st
 
 HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
@@ -234,6 +248,12 @@ class H(BaseHTTPRequestHandler):
                 except Exception: pass
                 log.info("logout done")
                 self._send({"ok":True})
+            elif p.path=="/panel/go":
+                e = panel_entrance()
+                self.send_response(302)
+                self.send_header("Location", "/panel" + e)
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
             elif p.path=="/api/status":
                 st=status()
                 try: st["cloud"]=json.loads(subprocess.run(["python3","/root/cloudmode.py"],capture_output=True,text=True,timeout=25).stdout.strip())

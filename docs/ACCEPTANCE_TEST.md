@@ -191,3 +191,21 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 - 让豆包在沙箱执行 `1pctl user-info` 读到真实入口：`http://114.215.204.238:18090/cSK41ajJX5`，用户 `1panel_admin`，密码 `Jwgk8CoJfnts`。
 - 导航页磁贴改为直达 `/panel/cSK41ajJX5`（经 80 端口 proxy 到 18090 安全入口，实测 200、标题 loading…=1Panel 前端）。补「1Panel 登录信息」卡显示入口/用户名/密码。
 - 不新开端口；panel.moin520.me 同样走 80。
+
+
+## IP 直连 1Panel + 全量联动核查（2026-11-16 00:00）
+### 用户 3 问
+1. **沙箱重置后再点 1Panel 还能进吗** → 能。导航页磁贴固定 `/panel/go`，18800 后端从沙箱持久卷 `/home/user/.dsh_pend/state/panel_entrance.txt` 动态读安全入口（经 17800 /get + token），302 过去。文件由 `1pctl user-info` 解析写入；只要 10T 持久卷在，入口不变/变也可重读。
+2. **所有数据是否都在持久卷** → 是（实测）：`/home/user` 挂载 10T 持久卷，`1pctl` 的 `BASE_DIR=/home/user/.dsh_pend/1panel-data`（227M 数据），二进制在 `.dsh_pend/1panel`，`ensure.sh` 每次沙箱重建都从持久卷重注册 1Panel 并重指 BASE_DIR。网站/数据库/文件/控制面/frp 配置全在 `.dsh_pend`。控制面 token 也在 `.dsh_pend/state/token.txt`。
+3. **为什么点磁贴回到导航页，直连 18090 却行** → 两层：① 之前磁贴写死 `/panel/cSK41ajJX5`，1Panel 前端 HTML 里资源是绝对路径 `/assets/js/...`，经 80 请求 `/assets/` 落到 `location /` 返回导航页 HTML，前端加载失败；② moin 站点漏了 `/panel/` 与 `/panel/go` 路由（只 dbp 有），带 IP Host 时命中的是 moin。
+   已修：两站点都补 `location = /panel/go -> 18800`、`location /panel/ -> 18090/`、`location /assets/ -> 18090`。实测带 IP Host + Referer 完整跟随：`/panel/go`→302→`/panel/cSK41ajJX5`→`loading...`，JS 3.2MB `text/javascript`、CSS `text/css`，全部 200。**只用 IP + 80，无域名、无新端口。**
+
+### 全量联动核查（改一处查全部）
+- 13 个运行 py 文件：本地 release 与服务器 md5 逐一一致，ast 语法全 OK
+- nginx 两站点 / 导航页：已同步进 release/conf 与 release/web，nginx -t 通过
+- 7 服务 active：moin-unified / ka-pure / tunnel-watch / frps / nginx / xvfb / doubao-cdp
+- 6 入口(带IP Host)全 200：/ /lite/ /chat /api/status /dl/ /panel/go
+- 6 API 全 200：status/sessions/history/log/conv status/conv messages
+- status：logged=True svc=active ka=active watch=active sess=12 panel=/cSK41ajJX5 cloud=云电脑
+- 沙箱 17800/ping ok(uptime 241)，frps 两 proxy online，1Panel 登录页经 IP 直达
+- 端口：对外仅 80；17800/18090/7000 是 frps 隧道监听，18800/9222/7501 本地
