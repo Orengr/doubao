@@ -76,7 +76,7 @@ def main():
         if not sse:
             log.error("发送无有效回复（未落库）"); continue
         last_task = now
-        next_gap = random.randint(180, 300)  # 本次完成后重新抽 3~5 分钟
+        next_gap = random.randint(60, 90)  # 本次完成后重新抽 3~5 分钟
         log.info("下一次小任务将在 %d 秒后（维持沙箱活跃）", next_gap)
         reply = API.extract_reply(sse)
         log.info("豆包回复: %s", reply[:100])

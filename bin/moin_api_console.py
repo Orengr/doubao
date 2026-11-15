@@ -111,160 +111,253 @@ def status():
     return st
 
 PANEL_HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Moin 面板</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f19"><title>Moin 面板</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f19;--card:#121826;--card2:#1a2233;--line:#243044;--txt:#e8eefc;--dim:#7f8da8;--ok:#3ddc97;--warn:#ffb648;--err:#ff5c7c;--acc:#4d8dff;--acc2:#7c5cff}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;padding-bottom:env(safe-area-inset-bottom)}
-.top{position:sticky;top:0;z-index:20;background:rgba(11,15,25,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px}
-.logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
-.top h1{font-size:15px;font-weight:700;flex:1}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(61,220,151,.18)}
-.dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(255,92,124,.18)}
-.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(255,182,72,.18)}
-.tabs{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:53px;z-index:19;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tab{flex:none;padding:7px 14px;border-radius:9px;font-size:13px;color:var(--dim);cursor:pointer;white-space:nowrap;border:1px solid transparent}
-.tab.on{background:var(--card2);color:var(--txt);border-color:var(--line)}
-.wrap{padding:14px;max-width:860px;margin:0 auto}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow-x:hidden}
+.top{position:fixed;top:0;left:0;right:0;height:52px;z-index:30;background:rgba(11,15,25,.98);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 14px}
+.burger{width:34px;height:34px;display:grid;place-items:center;cursor:pointer;border-radius:9px;flex:none}
+.burger:active{background:var(--card2)}
+.burger span{display:block;width:17px;height:2px;background:var(--txt);border-radius:2px;position:relative;transition:.25s}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:17px;height:2px;background:var(--txt);border-radius:2px;transition:.25s}
+.burger span::before{top:-5.5px}.burger span::after{top:5.5px}
+body.menu .burger span{background:transparent}
+body.menu .burger span::before{top:0;transform:rotate(45deg)}
+body.menu .burger span::after{top:0;transform:rotate(-45deg)}
+.top h1{font-size:15.5px;font-weight:700;flex:1}
+.live{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--dim)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.85)}}
+.dot.err{background:var(--err);animation:none}
+.side{position:fixed;top:0;left:0;bottom:0;width:230px;background:#0f1520;border-right:1px solid var(--line);z-index:40;transform:translateX(-100%);transition:.28s cubic-bezier(.4,0,.2,1);padding-top:14px;overflow-y:auto}
+body.menu .side{transform:translateX(0);box-shadow:8px 0 32px rgba(0,0,0,.5)}
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:35;opacity:0;pointer-events:none;transition:.25s}
+body.menu .mask{opacity:1;pointer-events:auto}
+.side .brand{padding:6px 18px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.side .brand .lg{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:700}
+.side .brand b{font-size:14.5px}.side .brand small{display:block;font-size:10.5px;color:var(--dim);font-weight:400}
+.nav{padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:#b6c2d9;font-size:13.5px;text-decoration:none;margin-bottom:2px;cursor:pointer}
+.nav a .i{width:20px;text-align:center;opacity:.85;font-size:15px}
+.nav a.on{background:var(--card2);color:var(--txt);font-weight:600}
+.nav a:active{background:var(--card2)}
+.nav .grp{font-size:10.5px;color:var(--dim);padding:12px 12px 5px;letter-spacing:1px}
+main{padding:66px 14px 24px;max-width:900px;margin:0 auto}
+h2{font-size:12.5px;color:var(--dim);letter-spacing:.9px;text-transform:uppercase;margin:18px 0 10px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+h2:first-child{margin-top:0}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px}
-.kpi{text-align:center}
-.kpi .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
-.kpi .k{font-size:11.5px;color:var(--dim);margin-top:2px}
-.bar{height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:8px}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:.4s}
+.kpi{position:relative;overflow:hidden}
+.kpi .v{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.kpi .k{font-size:11.5px;color:var(--dim);margin-top:1px}
+.kpi .sub{font-size:10.5px;color:var(--dim);margin-top:6px;opacity:.8}
+.ring{width:44px;height:44px;position:absolute;right:12px;top:50%;transform:translateY(-50%)}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:4;stroke-linecap:round}
+.ring .bgc{stroke:var(--card2)}
+.ring .fgc{stroke:var(--acc);transition:stroke-dasharray .5s}
+.ring .txt{position:absolute;inset:0;display:grid;place-items:center;font-size:9.5px;color:var(--dim)}
+.bar{height:7px;background:var(--card2);border-radius:4px;overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .55s ease}
 .bar.warn i{background:linear-gradient(90deg,var(--warn),#ff8a3d)}
 .bar.err i{background:linear-gradient(90deg,var(--err),#ff3d6e)}
-h2{font-size:13px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase;margin:16px 0 9px;font-weight:600}
 .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;gap:10px}
 .row:last-child{border:0}
 .row .k{color:var(--dim);font-size:12.5px;flex:none}
 .row .v{font-weight:600;text-align:right;word-break:break-all;font-size:12.5px}
 .ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}.dim{color:var(--dim)}
-.pill{font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
-.pill.ok{background:rgba(61,220,151,.15)}
-.pill.err{background:rgba(255,92,124,.15)}
-button{background:var(--acc);border:0;color:#fff;padding:8px 14px;border-radius:9px;font-size:13px;cursor:pointer}
+.pill{font-size:11px;padding:2px 9px;border-radius:8px;white-space:nowrap;font-weight:600}
+.pill.ok{background:rgba(61,220,151,.15);color:var(--ok)}
+.pill.err{background:rgba(255,92,124,.15);color:var(--err)}
+button{background:var(--acc);border:0;color:#fff;padding:9px 15px;border-radius:9px;font-size:13px;cursor:pointer;font-weight:500}
 button.sec{background:var(--card2);border:1px solid var(--line);color:var(--txt)}
-button.sm{padding:5px 10px;font-size:12px}
+button.sm{padding:5px 11px;font-size:12px}
 button:active{transform:scale(.97)}
-input,textarea,select{background:#0d1117;border:1px solid var(--line);color:var(--txt);padding:9px 11px;border-radius:9px;font-size:13px;width:100%;font-family:inherit}
-pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:52vh;font-size:11.5px;color:#9fb0c9;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,SFMono-Regular,monospace}
-.fitem{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+input,textarea,select{background:#0d1117;border:1px solid var(--line);color:var(--txt);padding:10px 12px;border-radius:9px;font-size:13px;width:100%;font-family:inherit;outline:none}
+input:focus,textarea:focus{border-color:var(--acc)}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:50vh;font-size:11.5px;color:#9fb0c9;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.fitem{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
 .fitem:last-child{border:0}
-.fitem .ico{width:26px;height:26px;border-radius:7px;background:var(--card2);display:grid;place-items:center;font-size:12px;flex:none}
+.fitem .ico{width:27px;height:27px;border-radius:8px;background:var(--card2);display:grid;place-items:center;font-size:12px;flex:none}
 .fitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fitem .sz{font-size:11px;color:var(--dim);flex:none}
-.toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.toolbar input{flex:1;min-width:140px}
+.toolbar{display:flex;gap:8px;margin-bottom:11px}
+.toolbar input{flex:1}
 .hide{display:none}
+.tip{font-size:11.5px;color:var(--dim);padding:6px 0}
+@media(max-width:420px){main{padding:64px 11px 20px}.grid{gap:8px}.card{padding:12px}}
 </style></head><body>
-<div class="top"><div class="logo">M</div><h1>Moin 面板</h1><span class="dot" id="dot"></span><span id="hostTxt" class="dim" style="font-size:11.5px"></span></div>
-<div class="tabs" id="tabs"></div>
-<div class="wrap" id="view"></div>
+<div class="top"><div class="burger" onclick="toggleMenu()"><span></span></div><h1 id="pageTitle">概览</h1>
+<div class="live"><span class="dot" id="liveDot"></span><span id="liveTxt">实时</span></div></div>
+<div class="mask" onclick="toggleMenu()"></div>
+<div class="side">
+  <div class="brand"><div class="lg">M</div><div><b>Moin 面板</b><small id="hostSm">豆包沙箱</small></div></div>
+  <div class="nav" id="nav"></div>
+</div>
+<main id="view"><div class="card dim">加载中…</div></main>
 <script>
-const TABS=[["overview","概览"],["health","健康"],["files","文件"],["sites","站点"],["procs","进程"],["containers","容器"],["terminal","终端"]];
-let cur="overview", S={};
-function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
-function fmtU(s){if(!s)return"—";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d>0?d+"天"+h+"时":h>0?h+"时"+m+"分":m+"分"+(s%60)+"秒"}
-function fmtSz(b){if(!b)return"0";const u=["B","K","M","G","T"];let i=0;while(b>=1024&&i<4){b/=1024;i++}return b.toFixed(i?1:0)+u[i]}
-function barCls(p){p=parseFloat(p)||0;return p>85?"err":p>70?"warn":""}
-async function api(p,opt){const r=await fetch(p,opt);if(!r.ok)throw new Error(r.status);const t=await r.text();try{return JSON.parse(t)}catch(e){return t}}
-function renderTabs(){document.getElementById('tabs').innerHTML=TABS.map(([k,n])=>'<div class="tab '+(k===cur?'on':'')+'" onclick="go(\''+k+'\')">'+n+'</div>').join('')}
-function go(k){cur=k;renderTabs();load()}
+var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["files","文件管理","▤","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
+var cur="overview",S={},es=null;
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fmtU(s){if(!s)return"—";var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d>0?d+"天"+h+"时":(h>0?h+"时"+m+"分":m+"分"+(Math.floor(s%60))+"秒")}
+function fmtSz(b){if(!b)return"0";var u=["B","K","M","G","T"],i=0;while(b>=1024&&i<4){b/=1024;i++}return b.toFixed(i?1:0)+u[i]}
+function barCls(p){p=parseFloat(p)||0;return p>85?"err":(p>70?"warn":"")}
+async function api(p,opt){var r=await fetch(p,opt);var t=await r.text();try{return JSON.parse(t)}catch(e){return t}}
+function toggleMenu(){document.body.classList.toggle('menu')}
+function renderNav(){var g="",h="";NAV.forEach(function(x){if(x[3]!==g){g=x[3];h+='<div class="grp">'+g+'</div>'}h+='<a class="'+(x[0]===cur?'on':'')+'" onclick="go(\\''+x[0]+'\\')"><span class="i">'+x[2]+'</span>'+x[1]+'</a>'});document.getElementById('nav').innerHTML=h}
+function go(k){cur=k;var t=NAV.filter(function(x){return x[0]===k})[0];document.getElementById('pageTitle').textContent=t?t[1]:k;renderNav();document.body.classList.remove('menu');load()}
+function setLive(ok){var d=document.getElementById('liveDot');d.className='dot'+(ok?'':' err');document.getElementById('liveTxt').textContent=ok?'实时':'断开'}
 async function load(){
-  const v=document.getElementById('view');
+  var v=document.getElementById('view');
   try{
-    if(cur==='overview'){const o=await api('/api/panel/overview');S.o=o;v.innerHTML=ovHTML(o)}
-    else if(cur==='health'){const h=await api('/api/panel/services');v.innerHTML=healthHTML(h)}
+    if(cur==='overview'){S.ov=await api('/api/panel/overview');v.innerHTML=ovHTML(S.ov)}
+    else if(cur==='health'){S.h=await api('/api/panel/services');v.innerHTML=healthHTML(S.h)}
     else if(cur==='files'){await files('')}
-    else if(cur==='sites'){const s=await api('/api/panel/sites');v.innerHTML=sitesHTML(s)}
-    else if(cur==='procs'){const p=await api('/api/panel/procs');v.innerHTML=procsHTML(p)}
-    else if(cur==='containers'){const c=await api('/api/panel/containers');v.innerHTML=contHTML(c)}
+    else if(cur==='sites'){S.s=await api('/api/panel/sites');v.innerHTML=sitesHTML(S.s)}
+    else if(cur==='databases'){S.d=await api('/api/panel/databases');v.innerHTML=dbHTML(S.d)}
+    else if(cur==='procs'){S.p=await api('/api/panel/procs');v.innerHTML=procsHTML(S.p)}
+    else if(cur==='containers'){S.c=await api('/api/panel/containers');v.innerHTML=contHTML(S.c)}
+    else if(cur==='cron'){S.cr=await api('/api/panel/cron');v.innerHTML=cronHTML(S.cr)}
+    else if(cur==='backup'){v.innerHTML=backupHTML()}
+    else if(cur==='ftp'){v.innerHTML=ftpHTML()}
     else if(cur==='terminal'){v.innerHTML=termHTML()}
   }catch(e){v.innerHTML='<div class="card err">加载失败: '+esc(e.message)+'</div>'}
 }
+function ring(p,label){
+  var r=17,c=2*Math.PI*r,off=c*(1-p/100);
+  var col=p>85?'#ff5c7c':(p>70?'#ffb648':'#4d8dff');
+  return '<div class="ring"><svg width="44" height="44"><circle class="bgc" cx="22" cy="22" r="'+r+'"/><circle class="fgc" cx="22" cy="22" r="'+r+'" stroke="'+col+'" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'"/></svg><div class="txt">'+Math.round(p)+'%</div></div>';
+}
 function ovHTML(o){
-  const mp=o.mem_total_mb?Math.round(o.mem_used_mb/o.mem_total_mb*100):0;
-  const dp=parseFloat(o.disk_pct)||0;
-  return '<h2>系统</h2><div class="grid">'+
-   '<div class="card kpi"><div class="v">'+esc(o.cpu_cores)+'</div><div class="k">CPU 核心</div></div>'+
-   '<div class="card kpi"><div class="v">'+esc(o.procs)+'</div><div class="k">进程数</div></div>'+
-   '<div class="card kpi"><div class="v">'+fmtU(o.uptime_sec)+'</div><div class="k">运行时长</div></div>'+
-   '<div class="card kpi"><div class="v">'+esc(o.agent_uptime?fmtU(o.agent_uptime):"—")+'</div><div class="k">Agent 存活</div></div>'+
-   '</div>'+
-   '<h2>内存</h2><div class="card"><div class="row"><span class="k">已用 / 总</span><span class="v">'+o.mem_used_mb+' MB / '+o.mem_total_mb+' MB</span></div>'+
-   '<div class="bar '+barCls(mp)+'"><i style="width:'+mp+'%"></i></div>'+
-   '<div class="row dim" style="border:0;padding-top:6px"><span class="k">占用率</span><span class="v">'+mp+'%</span></div></div>'+
-   '<h2>磁盘 (持久卷)</h2><div class="card"><div class="row"><span class="k">已用 / 总</span><span class="v">'+esc(o.disk_used)+' / '+esc(o.disk_total)+'</span></div>'+
-   '<div class="bar '+barCls(dp)+'"><i style="width:'+dp+'%"></i></div>'+
-   '<div class="row dim" style="border:0;padding-top:6px"><span class="k">可用</span><span class="v">'+esc(o.disk_avail)+' ('+esc(o.disk_pct)+')</span></div></div>'+
-   '<h2>主机信息</h2><div class="card">'+
-   '<div class="row"><span class="k">主机名</span><span class="v">'+esc(o.host)+'</span></div>'+
-   '<div class="row"><span class="k">系统</span><span class="v">'+esc(o.os)+'</span></div>'+
-   '<div class="row"><span class="k">内核</span><span class="v">'+esc(o.kernel)+'</span></div>'+
-   '<div class="row"><span class="k">负载</span><span class="v">'+esc(o.load)+'</span></div></div>';
+  var mp=o.mem_total_mb?Math.round(o.mem_used_mb/o.mem_total_mb*100):0;
+  var dp=parseFloat(o.disk_pct)||0;
+  return '<h2>系统概览 <span class="dim" style="text-transform:none;letter-spacing:0;font-weight:400" id="ovTime">'+new Date().toLocaleTimeString()+'</span></h2>'
+   +'<div class="grid">'
+   +'<div class="card kpi"><div class="v" id="kCpu">'+o.cpu_cores+'</div><div class="k">CPU 核心</div><div class="sub" id="kLoad">负载 '+esc(o.load.split(" ")[0])+'</div></div>'
+   +'<div class="card kpi"><div class="v" id="kMem">'+o.mem_used_mb+'<span style="font-size:12px;color:var(--dim)">M</span></div><div class="k">内存已用</div>'+ring(mp)+'</div>'
+   +'<div class="card kpi"><div class="v" id="kDisk">'+esc(o.disk_used)+'</div><div class="k">磁盘已用</div>'+ring(dp)+'</div>'
+   +'<div class="card kpi"><div class="v" id="kUp">'+fmtU(o.uptime_sec)+'</div><div class="k">运行时长</div><div class="sub" id="kProc">'+o.procs+' 进程</div></div>'
+   +'</div>'
+   +'<h2>资源占用</h2><div class="card">'
+   +'<div class="row"><span class="k">内存</span><span class="v" id="memTxt">'+o.mem_used_mb+'M / '+o.mem_total_mb+'M</span></div>'
+   +'<div class="bar '+barCls(mp)+'"><i id="memBar" style="width:'+mp+'%"></i></div>'
+   +'<div class="row" style="border:0;padding-top:11px"><span class="k">磁盘 (10T 持久卷)</span><span class="v" id="diskTxt">'+esc(o.disk_used)+' / '+esc(o.disk_total)+'</span></div>'
+   +'<div class="bar '+barCls(dp)+'"><i id="diskBar" style="width:'+dp+'%"></i></div>'
+   +'</div>'
+   +'<h2>主机</h2><div class="card">'
+   +'<div class="row"><span class="k">主机名</span><span class="v" id="hHost">'+esc(o.host)+'</span></div>'
+   +'<div class="row"><span class="k">系统</span><span class="v">'+esc(o.os.replace(/PRETTY_NAME=|NAME=|"/g,"").split(" ").slice(0,3).join(" "))+'</span></div>'
+   +'<div class="row"><span class="k">内核</span><span class="v">'+esc(o.kernel)+'</span></div>'
+   +'<div class="row"><span class="k">平均负载</span><span class="v" id="hLoad">'+esc(o.load)+'</span></div>'
+   +'</div>';
 }
 function healthHTML(h){
-  const bad=h.filter(x=>!x.ok).length;
-  return '<h2>服务健康 '+(bad?'<span class="err">('+bad+' 项异常)</span>':'<span class="ok">(全部正常)</span>')+'</h2><div class="card">'+
-   h.map(x=>'<div class="row"><span class="k">'+esc(x.name)+'</span><span class="pill '+(x.ok?'ok':'err')+'">'+(x.ok?'正常':'异常')+'</span></div>').join('')+
-   '</div><div style="margin-top:12px"><button class="sec" onclick="load()">重新检测</button></div>';
+  var bad=h.filter(function(x){return !x.ok}).length;
+  return '<h2>服务健康 '+(bad?'<span class="err">'+bad+' 项异常</span>':'<span class="ok">全部正常</span>')+'</h2><div class="card" id="hBox">'
+   +h.map(function(x){return '<div class="row"><span class="k">'+esc(x.name)+'</span><span class="pill '+(x.ok?'ok':'err')+'">'+(x.ok?'正常':'异常')+'</span></div>'}).join('')
+   +'</div><div style="margin-top:12px"><button class="sec sm" onclick="load()">立即检测</button></div>';
 }
 async function files(p){
-  const d=await api('/api/panel/ls?p='+encodeURIComponent(p||''));
-  S.fp=d.path;
-  const up=p&&d.path?d.path.split('/').slice(0,-1).join('/'):'';
+  var d=await api('/api/panel/ls?p='+encodeURIComponent(p||''));
+  var up=p?d.path.split('/').slice(0,-1).join('/'):'';
   document.getElementById('view').innerHTML=
-   '<div class="toolbar"><input id="fp" value="'+esc(d.path)+'"><button class="sm" onclick="files(document.getElementById(\'fp\').value)">打开</button></div>'+
-   '<div class="card">'+(p?'<div class="fitem" onclick="files(\''+esc(up)+'\')"><div class="ico">↑</div><div class="nm">.. 上级</div></div>':'')+
-   d.items.map(i=>'<div class="fitem" onclick="'+(i.dir?'files(\''+esc(d.path.replace(/\/$/,''))+'/'+esc(i.name)+'\')':'openFile(\''+esc(d.path.replace(/\/$/,''))+'/'+esc(i.name)+'\')')+'"><div class="ico">'+(i.dir?'▸':'▤')+'</div><div class="nm">'+esc(i.name)+'</div><div class="sz">'+(i.dir?'':fmtSz(i.size))+'</div></div>').join('')+
-   '</div><pre id="fileview" class="hide"></pre>';
+   '<div class="toolbar"><input id="fp" value="'+esc(d.path)+'"><button class="sm" onclick="files(document.getElementById(\\'fp\\').value)">打开</button></div>'
+   +'<div class="card">'+(p?'<div class="fitem" onclick="files(\\''+esc(up)+'\\')"><div class="ico">↑</div><div class="nm">.. 上级目录</div></div>':'')
+   +d.items.map(function(i){var full=d.path.replace(/\/$/,'')+'/'+i.name;return '<div class="fitem" onclick="'+(i.dir?'files('+JSON.stringify(full)+')':'openFile('+JSON.stringify(full)+')')+'"><div class="ico">'+(i.dir?'▸':'▤')+'</div><div class="nm">'+esc(i.name)+'</div><div class="sz">'+(i.dir?'':fmtSz(i.size))+'</div></div>'}).join('')
+   +'</div><pre id="fileview" class="hide"></pre>';
 }
-async function openFile(p){
-  const c=await api('/api/panel/read?p='+encodeURIComponent(p));
-  const el=document.getElementById('fileview');el.classList.remove('hide');el.textContent=c;
-  el.scrollIntoView({behavior:'smooth'});
-}
+async function openFile(p){var c=await api('/api/panel/read?p='+encodeURIComponent(p));var el=document.getElementById('fileview');el.classList.remove('hide');el.textContent=c;el.scrollIntoView({behavior:'smooth'})}
 function sitesHTML(s){
-  if(!s.length)return '<div class="card dim">暂无站点。站点目录位于持久卷 /home/user/.dsh_pend/www</div>';
-  return '<h2>站点 ('+s.length+')</h2><div class="card">'+s.map(x=>'<div class="row"><span class="k">'+esc(x.name)+'</span><span class="v dim">'+esc(x.path)+' · '+x.files+' 文件</span></div>').join('')+'</div>';
+  return '<h2>网站 ('+s.length+')</h2><div class="card">'+(s.length?s.map(function(x){return '<div class="row"><span class="k">'+esc(x.name)+'</span><span class="v dim">'+x.files+' 文件</span></div>'}).join(''):'<div class="dim">暂无站点</div>')+'</div>'
+   +'<h2>新建网站</h2><div class="card"><input id="sname" placeholder="站点名，如 blog"><div style="margin-top:9px"><button onclick="createSite()">创建站点</button></div><div class="tip">创建后目录在持久卷 www/站点名，并自动配置 nginx</div></div><pre id="sout" class="hide"></pre>';
 }
+async function createSite(){
+  var n=document.getElementById('sname').value.trim();if(!n)return;
+  var r=await api('/api/panel/site_create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
+  var el=document.getElementById('sout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2);load();
+}
+function dbHTML(d){
+  var rows=d.length?d.map(function(x){return '<div class="row"><span class="k">'+esc(x)+'</span><span class="v dim" onclick="dbTables('+JSON.stringify(x)+')">查看表</span></div>'}).join(''):'<div class="dim">暂无数据库</div>';
+  return '<h2>MySQL 8.0 ('+d.length+')</h2><div class="card">'+rows+'</div>'
+   +'<h2>新建数据库</h2><div class="card"><input id="newdb" placeholder="库名，如 myapp"><div style="margin-top:9px"><button onclick="createDB()">创建</button></div></div><pre id="dbout" class="hide"></pre>';
+}
+async function dbTables(db){var t=await api('/api/panel/tables?db='+encodeURIComponent(db));var el=document.getElementById('dbout');el.classList.remove('hide');el.textContent=db+' 的表 ('+t.length+'):\n'+(t.length?t.join('\n'):'(空)')}
+async function createDB(){var n=document.getElementById('newdb').value.trim();if(!n)return;var sql='CREATE DATABASE IF NOT EXISTS '+n.replace(/[^A-Za-z0-9_]/g,'');var r=await api('/api/panel/dbquery?q='+encodeURIComponent(sql));var el=document.getElementById('dbout');el.classList.remove('hide');el.textContent=JSON.stringify(r);load()}
 function procsHTML(p){
-  return '<h2>进程 Top '+p.length+'</h2><div class="card">'+p.map(x=>'<div class="row"><span class="k">'+esc(x.name)+' <span class="dim">#'+x.pid+'</span></span><span class="v dim">CPU '+x.cpu+'% · 内存 '+x.rss_mb+'M</span></div>').join('')+'</div>';
+  return '<h2>进程 Top '+p.length+'</h2><div class="card">'+p.map(function(x){return '<div class="row"><span class="k">'+esc(x.name)+' <span class="dim">#'+x.pid+'</span></span><span class="v dim">'+x.cpu+'% · '+x.rss_mb+'M</span></div>'}).join('')+'</div>';
 }
 function contHTML(c){
-  return '<h2>容器化运行 (proot)</h2><div class="card">'+(c.length?c.map(x=>'<div class="row"><span class="k">#'+esc(x.pid)+'</span><span class="v dim">'+esc(x.cmd)+'</span></div>').join(''):'<div class="dim">暂无容器进程</div>')+'</div>'+
-   '<h2>启动容器</h2><div class="card"><div style="margin-bottom:8px"><input id="cn" placeholder="名称(如 web1)"></div>'+
-   '<div style="margin-bottom:8px"><input id="cr" placeholder="rootfs 路径(可选，如 /home/user/.dsh_pend/rootfs/alpine)"></div>'+
-   '<div style="margin-bottom:10px"><input id="cc" placeholder="启动命令，如 /bin/sh -c \"python3 -m http.server 8080\""></div>'+
-   '<button onclick="runC()">启动</button></div><pre id="cout" class="hide"></pre>';
+  return '<h2>容器应用 (proot 隔离)</h2><div class="card">'+(c.length?c.map(function(x){return '<div class="row"><span class="k">#'+esc(x.pid)+'</span><span class="v dim">'+esc(x.cmd)+'</span></div>'}).join(''):'<div class="dim">暂无运行中的应用</div>')+'</div>'
+   +'<h2>启动应用</h2><div class="card"><div style="margin-bottom:8px"><input id="cn" placeholder="应用名，如 web1"></div><div style="margin-bottom:8px"><input id="cr" placeholder="rootfs 路径（可选）"></div><div style="margin-bottom:10px"><input id="cc" placeholder="命令，如 python3 -m http.server 8080"></div><button onclick="runC()">启动</button></div><pre id="cout" class="hide"></pre>';
 }
-async function runC(){
-  const b={name:document.getElementById('cn').value||'app',rootfs:document.getElementById('cr').value||'',cmd:document.getElementById('cc').value||'/bin/sh'};
-  const r=await api('/api/panel/run_container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
-  const el=document.getElementById('cout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2);
+async function runC(){var b={name:document.getElementById('cn').value||'app',rootfs:document.getElementById('cr').value||'',cmd:document.getElementById('cc').value||'/bin/sh'};var r=await api('/api/panel/run_container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});var el=document.getElementById('cout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2)}
+function cronHTML(c){
+  return '<h2>计划任务</h2><div class="card">'+(c.length?c.map(function(x){return '<div class="row"><span class="v dim">'+esc(x)+'</span></div>'}).join(''):'<div class="dim">暂无计划任务</div>')+'</div>'
+   +'<h2>新建计划任务</h2><div class="card"><input id="crn" placeholder="cron 表达式，如 */5 * * * *"><div style="margin-top:8px"><input id="crc" placeholder="命令，如 /home/user/.dsh_pend/bin/backup.sh"></div><div style="margin-top:9px"><button onclick="addCron()">添加</button></div></div><pre id="crout" class="hide"></pre>';
+}
+async function addCron(){var e=document.getElementById('crn').value.trim(),c=document.getElementById('crc').value.trim();if(!e||!c)return;var r=await api('/api/panel/cron_add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expr:e,cmd:c})});var el=document.getElementById('crout');el.classList.remove('hide');el.textContent=JSON.stringify(r);load()}
+function backupHTML(){
+  return '<h2>数据备份</h2><div class="card"><div class="tip">备份持久卷数据到 tar.gz（含数据库 dump、网站文件、配置）</div><div style="margin-top:10px"><button onclick="doBackup()">立即备份</button><button class="sec sm" onclick="load()">刷新</button></div></div><pre id="bkout" class="hide"></pre>';
+}
+async function doBackup(){var el=document.getElementById('bkout');el.classList.remove('hide');el.textContent='备份中…';var r=await api('/api/panel/backup',{method:'POST'});el.textContent=JSON.stringify(r,null,2)}
+function ftpHTML(){
+  return '<h2>FTP / SFTP 账户</h2><div class="card"><div class="tip">沙箱内可使用 sftp（22 端口）访问持久卷目录</div>'
+   +'<div class="row"><span class="k">SFTP 地址</span><span class="v">沙箱内 127.0.0.1:22</span></div>'
+   +'<div class="row"><span class="k">根目录</span><span class="v">/home/user/.dsh_pend</span></div></div>'
+   +'<h2>说明</h2><div class="card dim" style="font-size:12.5px">FTP 需额外端口，当前通过 frp 仅暴露 80；如需 FTP 请在面板「容器应用」中启动 ftp server 并加隧道。</div>';
 }
 function termHTML(){
-  return '<h2>终端 (沙箱内执行)</h2><div class="card"><textarea id="cmd" rows="3" placeholder="输入命令，如 df -h 或 ls /home/user"></textarea>'+
-   '<div style="margin-top:9px;display:flex;gap:8px"><button onclick="runCmd()">执行</button><button class="sec" onclick="document.getElementById(\'cout2\').textContent=\'\'">清屏</button></div></div><pre id="cout2">就绪</pre>';
+  return '<h2>终端（沙箱内执行）</h2><div class="card"><textarea id="cmd" rows="3" placeholder="输入命令，如 df -h"></textarea><div style="margin-top:9px;display:flex;gap:8px"><button onclick="runCmd()">执行</button><button class="sec" onclick="document.getElementById(\\'cout2\\').textContent=\\'\\'">清屏</button></div></div><pre id="cout2">就绪</pre>';
 }
-async function runCmd(){
-  const c=document.getElementById('cmd').value;if(!c.trim())return;
-  const el=document.getElementById('cout2');el.textContent='执行中…';
-  try{const r=await api('/api/panel/sh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:c})});
-    el.textContent='$ '+c+'\n'+(r.out||'')+'\n[rc='+r.rc+']';}catch(e){el.textContent='失败: '+e.message}
+async function runCmd(){var c=document.getElementById('cmd').value;if(!c.trim())return;var el=document.getElementById('cout2');el.textContent='执行中…';try{var r=await api('/api/panel/sh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:c})});el.textContent='$ '+c+'\n'+(r.out||'')+'\n[rc='+r.rc+']'}catch(e){el.textContent='失败: '+e.message}}
+// ===== 实时更新（3 秒轮询 + 差值动画，无需刷新）=====
+var liveTimer=null;
+function startLive(){
+  if(liveTimer)clearInterval(liveTimer);
+  liveTimer=setInterval(async function(){
+    try{
+      if(cur==='overview'){
+        var o=await api('/api/panel/overview');
+        var mp=o.mem_total_mb?Math.round(o.mem_used_mb/o.mem_total_mb*100):0;
+        var dp=parseFloat(o.disk_pct)||0;
+        var set=function(id,val){var e=document.getElementById(id);if(e)e.textContent=val};
+        set('kMem',o.mem_used_mb);
+        set('kLoad','负载 '+o.load.split(' ')[0]);
+        set('kProc',o.procs+' 进程');
+        set('kUp',fmtU(o.uptime_sec));
+        set('memTxt',o.mem_used_mb+'M / '+o.mem_total_mb+'M');
+        set('diskTxt',o.disk_used+' / '+o.disk_total);
+        set('hLoad',o.load);
+        set('ovTime',new Date().toLocaleTimeString());
+        var mb=document.getElementById('memBar');
+        if(mb){mb.style.width=mp+'%';mb.parentNode.className='bar '+barCls(mp)}
+        var db=document.getElementById('diskBar');
+        if(db){db.style.width=dp+'%';db.parentNode.className='bar '+barCls(dp)}
+        setLive(true);
+      } else if(cur==='health'){
+        var h=await api('/api/panel/services');
+        var box=document.getElementById('hBox');
+        if(box)box.innerHTML=h.map(function(x){return '<div class="row"><span class="k">'+esc(x.name)+'</span><span class="pill '+(x.ok?'ok':'err')+'">'+(x.ok?'正常':'异常')+'</span></div>'}).join('');
+        setLive(true);
+      } else if(cur==='procs'){
+        var p=await api('/api/panel/procs');
+        document.getElementById('view').innerHTML=procsHTML(p);
+        setLive(true);
+      } else { setLive(true); }
+    }catch(e){setLive(false)}
+  },3000);
 }
-async function ping(){
-  try{const p=await api('/api/panel/ping');
-    document.getElementById('dot').className='dot '+(p.ok?'':'err');
-    document.getElementById('hostTxt').textContent=(p.host||'').replace(/^vefaas-/,'').split('-')[0]||'';
-  }catch(e){document.getElementById('dot').className='dot err'}
+async function boot(){
+  renderNav();
+  try{var p=await api('/api/panel/ping');document.getElementById('hostSm').textContent=(p.host||'').replace(/^vefaas-/,'').split('-')[0]||'沙箱'}catch(e){}
+  load();startLive();
 }
-renderTabs();load();ping();setInterval(ping,10000);
+boot();
 </script></body></html>"""
+
 
 HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Moin 控制台</title>
@@ -332,7 +425,7 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <div class="sw"><span>新会话命名前缀</span><input id="rnPrefix" style="max-width:110px" onchange="saveSet('rename_prefix',this.value)"></div>
 <div class="sw"><span>命名后缀样式</span><select id="rnStyle" style="max-width:100px" onchange="saveSet('rename_style',this.value)"><option value="letter">A/B/C</option><option value="number">1/2/3</option></select></div>
 <div class="sw"><span>当前计数</span><span id="rnCounter" class="dim">—</span></div></div>
-<div><div class="sw"><span>小任务保活</span><span class="green">每 3–5 分钟随机一次</span></div>
+<div><div class="sw"><span>小任务保活</span><span class="green" id="keepGapTxt">每 60–90 秒一次（维持沙箱活跃）</span></div>
 <div class="dim" style="font-size:11px;padding:4px 0">固定规则：只发 99 乘法表 / 404 网页等沙箱小任务；隧道哨兵每秒检测、连续 3 秒失败立即拉起，与小任务无关。</div>
 <div class="sw"><span>死亡关键词</span><input id="deathKw" style="max-width:200px" onchange="saveSet('death_keywords',this.value)"></div>
 <div class="sw"><span>预览下一个名字</span><span id="rnPreview" class="green">—</span></div></div></div></div>
@@ -483,6 +576,9 @@ class H(BaseHTTPRequestHandler):
                 elif sub == "overview": self._send(agent_get("/api/overview"))
                 elif sub == "services": self._send(agent_get("/api/services"))
                 elif sub == "sites": self._send(agent_get("/api/sites"))
+                elif sub == "databases": self._send(agent_get("/api/databases"))
+                elif sub == "tables": self._send(agent_get("/api/tables?db=" + urllib.parse.quote(g("db",""))))
+                elif sub == "dbquery": self._send(agent_get("/api/dbquery?q=" + urllib.parse.quote(g("q",""))))
                 elif sub == "procs": self._send(agent_get("/api/procs"))
                 elif sub == "containers": self._send(agent_get("/api/containers"))
                 elif sub == "ls":

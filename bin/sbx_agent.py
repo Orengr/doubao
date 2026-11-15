@@ -30,6 +30,79 @@ def safe(path):
         return None
     return p
 
+
+MYSQL = PEND + "/server/mysql/bin/mysql"
+MYSQL_SOCK = PEND + "/state/mysql.sock"
+
+def mysql_q(sql):
+    cmd = MYSQL + " --socket=" + MYSQL_SOCK + " -u root -N -B -e " + json.dumps(sql)
+    rc, out = sh(cmd, 20)
+    if rc != 0: return {"ok": False, "error": out[:300]}
+    rows = [ln.split("\t") for ln in out.strip().split("\n") if ln.strip()]
+    return {"ok": True, "rows": rows}
+
+def db_list():
+    r = mysql_q("SHOW DATABASES")
+    if not r.get("ok"): return []
+    skip = {"information_schema","performance_schema","mysql","sys"}
+    return [x[0] for x in r["rows"] if x and x[0] not in skip]
+
+def db_tables(db):
+    r = mysql_q("SHOW TABLES FROM `" + db.replace("`","") + "`")
+    return [x[0] for x in r["rows"]] if r.get("ok") else []
+
+def svc_status():
+    items = []
+    def alive(name, cmd, t=4):
+        rc, _ = sh(cmd, t); items.append({"name": name, "ok": rc == 0})
+    alive("控制面 17800", "curl -s -m 2 http://127.0.0.1:17800/ping | grep -q ok")
+    alive("面板 Agent", "curl -s -m 2 http://127.0.0.1:17802/api/ping?token=" + token() + " | grep -q ok")
+    alive("frpc 隧道", "pgrep -x frpc >/dev/null")
+    alive("nginx", "pgrep -x nginx >/dev/null")
+    alive("MySQL 8.0", "test -S " + MYSQL_SOCK + " && " + MYSQL + " --socket=" + MYSQL_SOCK + " -u root -e \"select 1\" >/dev/null 2>&1")
+    alive("PHP 8.1", "test -x " + PEND + "/server/php/bin/php")
+    return items
+
+
+def site_create(name):
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    if not n: return {"ok": False, "error": "bad name"}
+    root = os.path.join(PEND, "www", n)
+    os.makedirs(root, exist_ok=True)
+    idx = os.path.join(root, "index.html")
+    if not os.path.exists(idx):
+        open(idx, "w", encoding="utf-8").write("<h1>" + n + " is running</h1>\n<p>Moin Panel · " + time.strftime("%Y-%m-%d %H:%M") + "</p>")
+    # 写 nginx vhost（站点监控脚本会加载）
+    vh = os.path.join(PEND, "conf", "sites")
+    os.makedirs(vh, exist_ok=True)
+    conf = os.path.join(vh, n + ".conf")
+    open(conf, "w", encoding="utf-8").write(
+        "server {\n  listen 127.0.0.1:8080;\n  server_name " + n + ".local;\n  root " + root + ";\n  index index.html;\n  location / { try_files $uri $uri/ =404; }\n}\n")
+    return {"ok": True, "name": n, "root": root, "vhost": conf}
+
+def cron_add(expr, cmd):
+    rc, out = sh("crontab -l 2>/dev/null | grep -v '^#' | cat -; echo " + json.dumps(expr + " " + cmd), 10)
+    try:
+        cur = subprocess.run("crontab -l 2>/dev/null", shell=True, capture_output=True, text=True, timeout=10).stdout
+        new = (cur.rstrip() + "\n" if cur.strip() else "") + expr + " " + cmd + "\n"
+        p = subprocess.run("crontab -", shell=True, input=new, capture_output=True, text=True, timeout=10)
+        return {"ok": p.returncode == 0, "line": expr + " " + cmd, "err": (p.stderr or "")[:200]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:150]}
+
+def backup():
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    outdir = os.path.join(PEND, "backup")
+    os.makedirs(outdir, exist_ok=True)
+    sqlfile = os.path.join(outdir, "mysql_" + ts + ".sql")
+    mysqldump = PEND + "/server/mysql/bin/mysqldump"
+    if os.path.exists(mysqldump):
+        sh(mysqldump + " --socket=" + MYSQL_SOCK + " -u root --all-databases > " + sqlfile, 120)
+    tarf = os.path.join(outdir, "data_" + ts + ".tar.gz")
+    rc, out = sh("cd " + PEND + " && tar czf " + tarf + " www conf state 2>/dev/null", 180)
+    size = os.path.getsize(tarf) if os.path.exists(tarf) else 0
+    return {"ok": rc == 0, "file": tarf, "size": size, "mysql_dump": sqlfile if os.path.exists(sqlfile) else ""}
+
 def overview():
     rc, up = sh("cat /proc/uptime")
     up_s = float(up.split()[0]) if rc == 0 and up.split() else 0
@@ -66,20 +139,7 @@ def processes():
     return rows
 
 def services():
-    """服务健康：面板/站点/隧道/数据库等"""
-    items = []
-    checks = [
-        ("控制面 17800", "curl -s -m 2 http://127.0.0.1:17800/ping | grep -q ok"),
-        ("面板 Agent 17999", "curl -s -m 2 http://127.0.0.1:17999/api/ping?token=" + token() + " | grep -q ok"),
-        ("frpc 隧道", "pgrep -x frpc >/dev/null"),
-        ("nginx", "pgrep -x nginx >/dev/null"),
-        ("MySQL", "pgrep -x mysqld >/dev/null"),
-        ("PHP-FPM", "pgrep -x php-fpm >/dev/null"),
-    ]
-    for name, cmd in checks:
-        rc, _ = sh(cmd, 5)
-        items.append({"name": name, "ok": rc == 0})
-    return items
+    return svc_status()
 
 def sites():
     """站点：扫描 /www/wwwroot 或 PEND/www"""
@@ -125,10 +185,20 @@ class H(BaseHTTPRequestHandler):
             return self._s(200, {"ok": True, "host": overview()["host"], "uptime": int(time.time()-START)})
         if not self._ok(q): return self._s(401, {"error": "bad token"})
         try:
+            if p == "/api/sites": return self._s(200, sites())
+            if p == "/api/databases": return self._s(200, db_list())
+            if p == "/api/tables":
+                return self._s(200, db_tables(q.get("db",[""])[0]))
+            if p == "/api/dbquery":
+                return self._s(200, mysql_q(q.get("q",[""])[0]))
             if p == "/api/overview": return self._s(200, overview())
             if p == "/api/procs": return self._s(200, processes())
             if p == "/api/services": return self._s(200, services())
-            if p == "/api/sites": return self._s(200, sites())
+            if p == "/api/databases": return self._s(200, db_list())
+            if p == "/api/tables":
+                return self._s(200, db_tables(q.get("db",[""])[0]))
+            if p == "/api/dbquery":
+                return self._s(200, mysql_q(q.get("q",[""])[0]))
             if p == "/api/containers": return self._s(200, containers())
             if p == "/api/cron": return self._s(200, cron_jobs())
             if p == "/api/ls":
@@ -171,6 +241,14 @@ class H(BaseHTTPRequestHandler):
                 os.makedirs(os.path.dirname(f), exist_ok=True)
                 open(f, "w", encoding="utf-8").write(d.get("content", ""))
                 return self._s(200, {"ok": True, "path": f})
+            if p == "/api/site_create":
+                d = json.loads(body) if body else {}
+                return self._s(200, site_create(d.get("name","")))
+            if p == "/api/cron_add":
+                d = json.loads(body) if body else {}
+                return self._s(200, cron_add(d.get("expr",""), d.get("cmd","")))
+            if p == "/api/backup":
+                return self._s(200, backup())
             if p == "/api/run_container":
                 # 容器化效果：proot 隔离运行（无 root 权限需求）
                 d = json.loads(body)
