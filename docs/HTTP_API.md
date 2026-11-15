@@ -248,3 +248,39 @@ sessionid + sessionid_ss 全拿到
 旧版 X-Bogus header。GitHub 公开的 a_bogus Python 实现是抖音版本，
 与豆包版本参数顺序/密钥有差异 → 签名被拒（invalid param）
 ```
+
+
+---
+
+## 八、710022002「访问频繁」的真相（2026-11-15 12:20 确认）
+
+### 不是真的限频！
+每次请求都是**固定 247 字节、立即返回**——真实限频不会这样。
+这是服务端对该请求的**硬性拦截**。
+
+### 根因分析
+```
+新账号（18053220144 注册的 uid=1008730618201603），
+session 通过 API 有效（recent_conv 返回 status=0+uid），
+但 samantha/chat/completion 报「访问频繁」。
+
+原因候选：
+1. 新账号需要先在网页完成首次设备验证/首次对话
+2. 该账号缺少 device_id 绑定（sms_login 纯HTTP没有绑定浏览器设备）
+3. 账号等级/风控评分过低
+```
+
+### 对照实验数据
+```
+空 cookie → recent_conv: 712012001 (过期)
+假 cookie → recent_conv: 712012001
+真 cookie → recent_conv: status=0 + uid=1008730618201603 ✓
+真 cookie → samantha:   710022002 (无论 aid 是 497858 还是 582478)
+```
+
+### 可能的突破方向（未完成）
+```
+1. 从豆包页面 JS dump 完整的 a_bogus/frontierSign 算法
+2. 在真实浏览器 UI 完成一次对话后，samantha 接口可能会解锁
+3. 使用完整的 device_id 注册流程（不是 sms_login，而是完整客户端模拟）
+```
