@@ -522,6 +522,49 @@ dbp-ctl.py 支持 /manual.html，根路径 / 与 index.html 归入白名单
 
 **5. 自测 88 → 94 项**
 
+### Round 19-22 最终成果
+
+**1. 短信全自动登录：✅ 完全打通（2026-11-15 08:26 实测）**
+
+```
+发码: POST /passport/web/send_code/（XOR 0x05 混淆手机号）→ message:success
+提交: POST /passport/web/sms_login/（手机号+验证码双混淆）
+结果: 36 cookies 全拿到（sessionid+sessionid_ss+sid_guard）
+活性: recent_conv status_code=0, uid=2328113677082323（主账号）
+部署: ck_full.txt 已更新
+```
+
+**关键修复链**（依次解决了 5 个连环问题）:
+```
+① Content-Type 缺 encoding=utf-8 → 712012002
+② QR 收集跳转链不完整 → 只有 3 个辅助 cookie
+③ sms_login 需 csrf/base cookie 前置 → error_code 7
+④ 验证码 5 分钟时效 → sms_auto.py 轮询文件实时提交
+⑤ JWT/浏览器指纹绑定 → cookie 注入跨实例无效（待解决）
+```
+
+**2. 服务架构最终形态**
+```
+moin-unified (18800) — 主管理台（浏览器版，已修 CPU/超时问题）
+moin-ka-http — cookie 活性检查（纯 HTTP）
+moin-lite — 停用（与 unified 端口冲突）
+frps/nginx — 隧道/路由
+```
+
+**3. 遗留问题**
+```
+- chat/completion 发消息：a_bogus 签名（抖音版实现与豆包不匹配）
+  → 短期方案：浏览器 UI 通道（unified /send）
+  → 长期方案：对照豆包页面 JS 修正 a_bogus 参数顺序
+- cookie 注入跨浏览器实例失效（指纹绑定）→ 每轮保活跑完整 sms 流程
+```
+
+**4. GitHub 提交链**
+```
+dbae872: a_bogus 障碍结论
+40cca66: 短信登录打通+错误码对照表
+```
+
 ## 未验证项
 
 以下因登录失效未能实测，但逻辑已通过语法检查：
