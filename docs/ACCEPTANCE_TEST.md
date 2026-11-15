@@ -141,3 +141,30 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 
 ### 运维注意
 - ka_pure 曾因 pkill -9 后 systemd 进入 failed 未自动拉起，用 systemctl reset-failed ka-pure && systemctl start ka-pure 恢复。常规「启用/停止保活」走 keepctl 不受影响。
+
+
+## 总项目进度对账（2026-11-15 23:05，实测）
+| 模块 | 状态 | 证据 |
+|---|---|---|
+| 纯接口短信登录 | ✅ | send_code/sms_login + X-Bogus，账号小777，7→12会话可见 |
+| 真发送消息接口 | ✅ | /chat/completion 抓包，SSE_ACK + /im/chain/single 落库 |
+| 会话/消息/重命名/新建 | ✅ | recent_conv/chain_single/update/create_conv_by_send |
+| 18800 纯接口管理台 | ✅ | 6板块/24API/独立对话页/登录退出/验活/防假登录 |
+| 账号设备档案+配置持久化 | ✅ | SQLite accounts/settings/conv_status/login_history |
+| 纯小任务保活(3-5min随机) | ✅ | ka_pure v8 日志「下一次小任务将在N秒后」 |
+| 独立隧道哨兵(1s/3fail) | ✅ | tunnel-watch active，连续3秒失败秒发拉起 |
+| 死亡检测/自动新建/重命名 | ✅ | 21:27 全自动链路实锤，老王(P) |
+| 云电脑/对话模式 | ✅ | 分段按钮，mode_select_value |
+| GitHub 开源 | ✅ | Orengr/doubao main 持续推送 |
+| **导航页(80端口)** | ✅ 本次补 | / 返回 Moin Server 导航，全部入口复用80，无新端口 |
+| 1Panel 网站 /panel/ | ❌ 502 | 沙箱侧 frpc 未回连，18090 无监听 |
+| 控制面 17800 | ❌ 000 | 沙箱侧 ctl2.py 未起 |
+| 沙箱 frp 隧道 | ❌ 断 | frps 7000 在跑但无 proxy |
+| 沙箱实例/ensure.sh 自恢复 | ❌ 未恢复 | 豆包回复空，隧道哨兵持续检测 |
+| a_bogus 纯离线算法 | ⚠️ 部分 | 真请求参数已抓全，但签名由页面 bdms 环境生成，未做纯 Python 复刻 |
+
+### 结论
+**整个项目未完成，约 85%。** 服务器侧（登录/接口/管理台/保活/哨兵/文档/GitHub/导航页）全部完成并实测；
+**豆包沙箱侧没起来**：frp 隧道断、17800/18090 无监听、1Panel 网站 502，导致"用豆包当免费服务器"这最后一环没闭环。
+导航页已如实标红 1Panel 不通，不假装在跑。
+剩余唯一主线：让豆包在沙箱里执行 ensure.sh/restore_all.sh 把 frpc+1Panel+控制面拉起来，隧道回连后 /panel/ 自动可用。
