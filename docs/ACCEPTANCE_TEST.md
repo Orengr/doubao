@@ -117,3 +117,16 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 - 「不支持/无法提供」从 death_keywords 移除（误判正常回复）；误标会话按规则手动改存活，下次保活重新读回复。
 - tunnel_watch 日志重复：systemd StandardOutput 改 null，只留 FileHandler。
 - ka_pure 死亡判断强化：每轮直接查 conv_status 强制重读，避免竞态。
+
+
+## v7 更新（2026-11-15 22:40）
+### 用户 5 项反馈
+1. **存活状态手动标记**：会话列表每个会话右侧加「标记存活 / 标记死亡」按钮（event.stopPropagation，不会误进会话）；聊天页工具条也保留。
+2. **哨兵与保活一起控制**：keepctl.status() 同时读 ka-pure/tunnel-watch，总状态=两者都 active；「启用保活」restart 两个服务，「停止保活」stop 两个服务。实测停止后 inactive/inactive，启用后 active/active。
+3. **1800 秒说明**：那是"沙箱小任务保活间隔"（之前默认 30 分钟），不是隧道检测。界面改成「小任务保活间隔 __ 分钟」并附说明：只控制 99 乘法表/404 网页这类小任务频率；隧道哨兵每秒检测、连续 3 秒失败立即拉起，不受此值影响。默认改为 600 秒（10 分钟）。
+4. **聊天页完整度/高度/时间**：/api/conv/messages 不再截断文本，带 create_time；聊天页每条显示日期时间；body 改 100dvh + overflow:hidden，消息区 min-height:0 可滚，输入区 flex-shrink:0 固定底部，加 safe-area-inset-bottom。
+5. **模式切换去 emoji**：改成下拉选择「云电脑（可执行沙箱任务） / 普通对话」，当前值回填，无 emoji。
+
+### 修
+- /api/keep/stop 原只停 ka-pure → 改 KEEP.stop_all()；新增 /api/keep/start。
+- /api/conv/new 误用 create_conv_by_ui → 切回已打通的 create_conv_by_send。

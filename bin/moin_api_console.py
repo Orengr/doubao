@@ -88,8 +88,10 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <button class="sec" onclick="keepTest()">🧪 保活功能测试</button>
 <span id="keepState2" class="dim"></span></div>
 <pre id="testOut" style="display:none;max-height:120px"></pre>
-<div class="row"><div class="modebtn"><button id="m9" onclick="setMode(9)">☁️ 云电脑</button><button id="m0" onclick="setMode(0)">💬 对话</button></div></div>
-<div class="row"><span class="tag" id="cloudMode">模式读取中…</span></div></div>
+<div class="row"><span class="dim" style="min-width:88px">回答模式</span>
+<select id="modeSel" style="max-width:180px" onchange="setMode(this.value)">
+<option value="9">云电脑（可执行沙箱任务）</option><option value="0">普通对话</option>
+</select><span class="tag" id="cloudMode">模式读取中…</span></div></div>
 
 <div class="card"><h2>③ 会话列表 <span class="dim" style="font-size:12px">点开=查看历史+发消息+等回复</span></h2>
 <div class="row"><button class="sec sm" onclick="newConv()">➕ 新建会话（按命名配置自动重命名）</button></div>
@@ -101,8 +103,8 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <div class="sw"><span>新会话命名前缀</span><input id="rnPrefix" style="max-width:110px" onchange="saveSet('rename_prefix',this.value)"></div>
 <div class="sw"><span>命名后缀样式</span><select id="rnStyle" style="max-width:100px" onchange="saveSet('rename_style',this.value)"><option value="letter">A/B/C</option><option value="number">1/2/3</option></select></div>
 <div class="sw"><span>当前计数</span><span id="rnCounter" class="dim">—</span></div></div>
-<div><div class="sw"><span>保活任务间隔(秒)</span><input id="keepInt" style="max-width:100px" onchange="saveSet('keep_interval_sec',this.value)"></div>
-<div class="sw"><span>恢复指令间隔(秒)</span><input id="wakeInt" style="max-width:100px" onchange="saveSet('wake_interval_sec',this.value)"></div>
+<div><div class="sw"><span>小任务保活间隔</span><input id="keepMin" type="number" min="1" style="max-width:80px" onchange="saveSet('keep_interval_sec',String(Math.max(60,parseInt(this.value||'30')*60)))"> 分钟</div>
+<div class="dim" style="font-size:11px;padding:4px 0">仅控制"99乘法表/404网页"这类沙箱小任务的发送频率；隧道哨兵是每秒检测，连续3秒失败立即拉起，不受此值影响。</div>
 <div class="sw"><span>死亡关键词</span><input id="deathKw" style="max-width:200px" onchange="saveSet('death_keywords',this.value)"></div>
 <div class="sw"><span>预览下一个名字</span><span id="rnPreview" class="green">—</span></div></div></div></div>
 
@@ -125,7 +127,8 @@ async function refreshAll(){
   const st=await api('/api/status'); S.status=st; S.settings=st.settings||{};
   const svc=st.service==='active';
   document.getElementById('head').innerHTML=st.account?'<span class="ok">● '+esc(st.account.name||st.account.uid)+'</span>':'<span class="bad">● 未登录</span>';
-  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>');
+  const sub='<span class="dim" style="font-size:11px">小任务:'+(st.ka_pure==='active'?'开':'关')+' · 哨兵:'+(st.tunnel_watch==='active'?'开':'关')+'</span>';
+  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>')+' '+sub;
   document.getElementById('keepState').innerHTML='保活 '+ks;
   document.getElementById('keepState2').innerHTML='保活 '+ks;
   document.getElementById('acct').innerHTML=st.account?
@@ -135,7 +138,7 @@ async function refreshAll(){
   // 模式
   const cm=st.cloud||{value:'0',label:'对话'};
   document.getElementById('cloudMode').innerText='当前: '+cm.label;
-  document.getElementById('m9').className=cm.value==='9'?'on':'';document.getElementById('m0').className=cm.value==='0'?'on':'';
+  document.getElementById('modeSel').value=cm.value;
   // 会话列表
   document.getElementById('convs').innerHTML=(st.sessions||[]).map(c=>
     '<div class="conv '+(c.keep?'keep':'')+' '+(c.alive?'':'dead')+'" data-cid="'+esc(c.id)+'" onclick="goConv(this)">'+
@@ -148,8 +151,7 @@ async function refreshAll(){
     document.getElementById('autoNew').value=set.auto_new_on_dead;
     document.getElementById('rnPrefix').value=set.rename_prefix||'';
     document.getElementById('rnStyle').value=set.rename_style||'letter';
-    document.getElementById('keepInt').value=set.keep_interval_sec||'';
-    document.getElementById('wakeInt').value=set.wake_interval_sec||'';
+    document.getElementById('keepMin').value=Math.round((parseInt(set.keep_interval_sec||'1800')||1800)/60);
     document.getElementById('deathKw').value=set.death_keywords||'';
     document.getElementById('rnCounter').innerText=set.rename_counter||'0';
     document.getElementById('rnPreview').innerText=set.next_name||'—';
@@ -157,6 +159,7 @@ async function refreshAll(){
   const h=await api('/api/history');
   document.getElementById('history').innerHTML=h.map(x=>'<div class="hist" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed #30363d"><span>'+esc(x.name||x.uid)+' · '+esc(x.phone||'')+'</span><span class="dim">'+new Date(x.at*1000).toLocaleString()+'</span></div>').join('')||'无';
 }
+async function toggleAlive(cid,to){await api('/api/conv/'+(to?'alive':'dead')+'?cid='+encodeURIComponent(cid));refreshAll()}
 async function saveSet(k,v){await api('/api/setting/set?key='+encodeURIComponent(k)+'&value='+encodeURIComponent(v));refreshAll()}
 async function loginSend(){const r=await fetch('/api/login/send?phone='+encodeURIComponent(document.getElementById('phone').value));document.getElementById('loginOut').innerText=await r.text()}
 async function loginVerify(){
@@ -243,10 +246,14 @@ class H(BaseHTTPRequestHandler):
                 try: self._send(open("/root/keep_test_result.json").read(), raw=True)
                 except Exception: self._send('{"ok":false,"results":[]}', raw=True)
             elif p.path=="/api/keep/stop":
-                subprocess.run(["systemctl","stop","ka-pure"],capture_output=True);self._send({"ok":True})
+                self._send(KEEP.stop_all())
+            elif p.path=="/api/keep/start":
+                self._send(KEEP.start_all())
             elif p.path=="/api/conv/messages":
                 msgs=API.single(g("cid"),30)
-                self._send([{"me":m.get("sender_id")=="2328113677082323","text":(m.get("tts_content") or "")[:300]} for m in msgs])
+                self._send([{"me":m.get("sender_id")=="2328113677082323",
+                             "text":m.get("tts_content") or m.get("content") or "",
+                             "time":int(m.get("create_time") or 0)} for m in msgs])
             elif p.path=="/api/conv/status":
                 cv=DB.get_conv(uid(),g("cid"));acc=DB.get_account(uid()) if uid() else None
                 cv["keep"]=(acc and acc["keep_conv_id"]==g("cid"));self._send(cv)
@@ -260,7 +267,7 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/api/conv/rename":
                 API.rename(g("cid"),g("name"));DB.upsert_conv(uid(),g("cid"),name=g("name"));self._send({"ok":True})
             elif p.path=="/api/conv/new":
-                name=DB.next_conv_name(uid());new=API.create_conv_by_ui(name)
+                name=DB.next_conv_name(uid());new=API.create_conv_by_send(name)
                 if new["conversation_id"]: DB.upsert_conv(uid(),new["conversation_id"],name,alive=1)
                 self._send(new)
             else: self.send_response(404);self.end_headers()
