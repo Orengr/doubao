@@ -109,6 +109,17 @@ def send_full(conv_id, text):
 
 # ---- 重命名（已抓包验证）----
 def rename(conv_id, name):
+    """重命名：先确保 CDP 页面在已登录的会话页（/chat 新对话页签名环境会报用户不合法）"""
+    # 重新注入完整 cookie（测试导航 /chat 会冲掉浏览器登录态）
+    try:
+        subprocess.run(["python3","/root/inject_ck.py","/root/ck_live2.txt"],capture_output=True,text=True,timeout=40)
+        time.sleep(4)
+    except Exception: pass
+    try:
+        w = websocket.create_connection(page_ws(), timeout=30)
+        w.send(json.dumps({"id":8,"method":"Page.navigate","params":{"url":"https://www.doubao.com/chat/38453755360368898"}}))
+        time.sleep(1); w.close(); time.sleep(5)
+    except Exception: pass
     return page_post_json("/alice/conversation/update", {"conversation_id":conv_id,"name":name})
 
 # ---- 新建会话 ----

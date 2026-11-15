@@ -35,7 +35,12 @@ def sessions_with_status():
     return out
 
 def status():
-    st=KEEP.status(); st["sessions"]=sessions_with_status()
+    st=KEEP.status(); ss=sessions_with_status(); st["sessions"]=ss
+    # 保活会话名以会话列表实时名字为准（避免账号库缓存旧名）
+    if st.get("account") and st["account"].get("keep_conv_id"):
+        k=st["account"]["keep_conv_id"]
+        hit=next((x for x in ss if x["id"]==k), None)
+        if hit: st["account"]["keep_conv_name"]=hit["name"]
     if uid(): st["settings"]=DB.all_settings(uid())
     return st
 
@@ -80,7 +85,9 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <div class="card"><h2>② 账号 / 保活开关 <span id="keepState" class="tag">检测中…</span></h2>
 <div id="acct">…</div>
 <div class="row"><button class="warn" onclick="activate()">启用保活</button><button class="sec" onclick="stopKeep()">停止保活</button>
+<button class="sec" onclick="keepTest()">🧪 保活功能测试</button>
 <span id="keepState2" class="dim"></span></div>
+<pre id="testOut" style="display:none;max-height:120px"></pre>
 <div class="row"><div class="modebtn"><button id="m9" onclick="setMode(9)">☁️ 云电脑</button><button id="m0" onclick="setMode(0)">💬 对话</button></div></div>
 <div class="row"><span class="tag" id="cloudMode">模式读取中…</span></div></div>
 
@@ -164,6 +171,15 @@ async function activate(){const d=S.status;if(!d.account){alert('未登录');ret
 async function stopKeep(){await api('/api/keep/stop');refreshAll()}
 async function setMode(v){await api('/api/cloud_mode/set?v='+v);refreshAll()}
 async function newConv(){const d=await api('/api/conv/new');if(d.need_manual){alert(d.hint)}else{alert('新建会话: '+d.conversation_id+' '+d.name)}refreshAll()}
+async function keepTest(){
+  const box=document.getElementById('testOut');box.style.display='block';box.innerText='测试启动：3秒「你好」→ 7秒「你好你好」→ 10秒「你好呀」…';
+  await api('/api/keep/test');
+  let n=0;const t=setInterval(async()=>{
+    n++;const d=await api('/api/keep/test/result');
+    box.innerText='进度:\n'+(d.results||[]).map(r=>r.at+'s  '+r.text+'  '+(r.ok?'✅ 已发送'+(r.reply?' 回复:'+r.reply:'')+(r.death?' ☠️'+r.death:''):'❌ 失败')).join('\n')+(d.running?'\n⏳ 等待下一次…':'\n✅ 测试完成');
+    if(!d.running||n>14){clearInterval(t)}
+  },1500);
+}
 async function loadLog(){const r=await fetch('/api/log');document.getElementById('logbox').innerText=await r.text()}
 refreshAll();loadLog();setInterval(refreshAll,20000);
 </script></body></html>"""
@@ -214,6 +230,18 @@ class H(BaseHTTPRequestHandler):
                 self._send(d)
             elif p.path=="/api/keep/set": self._send(KEEP.set_keep(g("uid"),g("cid"),g("name")))
             elif p.path=="/api/keep/activate": self._send(KEEP.activate(g("uid")))
+            elif p.path=="/api/keep/test":
+                threading_ok = True
+                # 用后台线程跑，接口立即返回
+                import threading as _th
+                def _run():
+                    subprocess.run(["python3","/root/keep_test_worker.py"], capture_output=True, text=True, timeout=140)
+                open("/root/keep_test_result.json","w").write(json.dumps({"ok":True,"running":True,"results":[]}))
+                _th.Thread(target=_run, daemon=True).start()
+                self._send({"ok":True,"started":True,"plan":[[3,"你好"],[7,"你好你好"],[10,"你好呀"]]})
+            elif p.path=="/api/keep/test/result":
+                try: self._send(open("/root/keep_test_result.json").read(), raw=True)
+                except Exception: self._send('{"ok":false,"results":[]}', raw=True)
             elif p.path=="/api/keep/stop":
                 subprocess.run(["systemctl","stop","ka-pure"],capture_output=True);self._send({"ok":True})
             elif p.path=="/api/conv/messages":

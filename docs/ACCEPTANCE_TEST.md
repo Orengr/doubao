@@ -84,3 +84,13 @@ python3 /tmp/ali.py "rm -f /root/ck_*.txt /root/doubao_accounts.db /root/active_
 ### 新建会话真实 body（抓包成果，供后续继续破）
 POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + conversation_id:"" + option.need_create_conversation:true + conversation_init_option/conversation_init_ext/conversation_mode:2/model_config/aggregate_params/ext。
 真人路径：导航 /chat → textarea[data-testid=chat_input_input] → 点 [data-testid=chat_input_send_button]。
+
+
+## v5 更新（2026-11-15 21:05）
+### 用户 3 个问题
+1. **保活会话名与列表不一致** → status() 以会话列表实时名为准；根因是浏览器 cookie 被测试导航冲掉导致重命名请求报「登录已过期」，rename() 现在先重新注入完整 cookie 再改名。实测列表与保活都显示「老王（O）」
+2. **会话点进去 502** → nginx 只代理 /lite/ 和 /api/，/chat 被 location / 转给已挂的 17800。已加 location /chat 转 18800 并 reload nginx，实测经 nginx /chat 200
+3. **保活功能测试按钮** → 「🧪 保活功能测试」：点击后后台 worker 按 3s「你好」/7s「你好你好」/10s「你好呀」三次发送，前端每 1.5s 轮询显示进度、结果、豆包回复、死亡判定。实测三条全部 ok:true + 真回复 + death:null
+
+### 根因记录
+- 浏览器 CDP cookie 数量从 43 掉到 15（反复导航 /chat 新对话页冲掉登录态）→ 页面 fetch 类接口（重命名/新建）报 710012001，但 curl 直连 cookie 仍有效。修法：页面环境操作前跑 inject_ck.py 重新注入。
