@@ -201,6 +201,7 @@ pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:1
 <script>
 var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["files","文件管理","▤","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
 var cur="overview",S={},es=null;
+function agentErr(o){var m=(o&&(o.error||o.detail))||'沙箱暂时离线';return '沙箱未连接：'+m+'（实例可能正在重建，约20秒后自动恢复）'}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function fmtU(s){if(!s)return"—";var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d>0?d+"天"+h+"时":(h>0?h+"时"+m+"分":m+"分"+(Math.floor(s%60))+"秒")}
 function fmtSz(b){if(!b)return"0";var u=["B","K","M","G","T"],i=0;while(b>=1024&&i<4){b/=1024;i++}return b.toFixed(i?1:0)+u[i]}
@@ -213,14 +214,14 @@ function setLive(ok){var d=document.getElementById('liveDot');d.className='dot'+
 async function load(){
   var v=document.getElementById('view');
   try{
-    if(cur==='overview'){S.ov=await api('/api/panel/overview');v.innerHTML=ovHTML(S.ov)}
-    else if(cur==='health'){S.h=await api('/api/panel/services');v.innerHTML=healthHTML(S.h)}
+    if(cur==='overview'){S.ov=await api('/api/panel/overview');if(!S.ov||!S.ov.host)throw new Error(agentErr(S.ov));v.innerHTML=ovHTML(S.ov)}
+    else if(cur==='health'){S.h=await api('/api/panel/services');if(!Array.isArray(S.h))throw new Error(agentErr(S.h));v.innerHTML=healthHTML(S.h)}
     else if(cur==='files'){await files('')}
-    else if(cur==='sites'){S.s=await api('/api/panel/sites');v.innerHTML=sitesHTML(S.s)}
-    else if(cur==='databases'){S.d=await api('/api/panel/databases');v.innerHTML=dbHTML(S.d)}
-    else if(cur==='procs'){S.p=await api('/api/panel/procs');v.innerHTML=procsHTML(S.p)}
-    else if(cur==='containers'){S.c=await api('/api/panel/containers');v.innerHTML=contHTML(S.c)}
-    else if(cur==='cron'){S.cr=await api('/api/panel/cron');v.innerHTML=cronHTML(S.cr)}
+    else if(cur==='sites'){S.s=await api('/api/panel/sitelist');if(!Array.isArray(S.s))throw new Error(agentErr(S.s));v.innerHTML=sitesHTML(S.s);bindSiteActions()}
+    else if(cur==='databases'){S.d=await api('/api/panel/databases');if(!Array.isArray(S.d))throw new Error(agentErr(S.d));v.innerHTML=dbHTML(S.d)}
+    else if(cur==='procs'){S.p=await api('/api/panel/procs');if(!Array.isArray(S.p))throw new Error(agentErr(S.p));v.innerHTML=procsHTML(S.p)}
+    else if(cur==='containers'){S.c=await api('/api/panel/containers');if(!Array.isArray(S.c))throw new Error(agentErr(S.c));v.innerHTML=contHTML(S.c)}
+    else if(cur==='cron'){S.cr=await api('/api/panel/cron');if(!Array.isArray(S.cr))throw new Error(agentErr(S.cr));v.innerHTML=cronHTML(S.cr)}
     else if(cur==='backup'){v.innerHTML=backupHTML()}
     else if(cur==='ftp'){v.innerHTML=ftpHTML()}
     else if(cur==='terminal'){v.innerHTML=termHTML();bindTerm()}
@@ -236,7 +237,7 @@ function ovHTML(o){
   var dp=parseFloat(o.disk_pct)||0;
   return '<h2>系统概览 <span class="dim" style="text-transform:none;letter-spacing:0;font-weight:400" id="ovTime">'+new Date().toLocaleTimeString()+'</span></h2>'
    +'<div class="grid">'
-   +'<div class="card kpi"><div class="v" id="kCpu">'+o.cpu_cores+'</div><div class="k">CPU 核心</div><div class="sub" id="kLoad">负载 '+esc(o.load.split(" ")[0])+'</div></div>'
+   +'<div class="card kpi"><div class="v" id="kCpu">'+o.cpu_cores+'</div><div class="k">CPU 核心</div><div class="sub" id="kLoad">负载 '+esc((o.load||"0 0 0").split(" ")[0])+'</div></div>'
    +'<div class="card kpi"><div class="v" id="kMem">'+o.mem_used_mb+'<span style="font-size:12px;color:var(--dim)">M</span></div><div class="k">内存已用</div>'+ring(mp)+'</div>'
    +'<div class="card kpi"><div class="v" id="kDisk">'+esc(o.disk_used)+'</div><div class="k">磁盘已用</div>'+ring(dp)+'</div>'
    +'<div class="card kpi"><div class="v" id="kUp">'+fmtU(o.uptime_sec)+'</div><div class="k">运行时长</div><div class="sub" id="kProc">'+o.procs+' 进程</div></div>'
@@ -273,13 +274,50 @@ async function files(p){
 }
 async function openFile(p){var c=await api('/api/panel/read?p='+encodeURIComponent(p));var el=document.getElementById('fileview');el.classList.remove('hide');el.textContent=c;el.scrollIntoView({behavior:'smooth'})}
 function sitesHTML(s){
-  return '<h2>网站 ('+s.length+')</h2><div class="card">'+(s.length?s.map(function(x){return '<div class="row"><span class="k">'+esc(x.name)+'</span><span class="v dim">'+x.files+' 文件</span></div>'}).join(''):'<div class="dim">暂无站点</div>')+'</div>'
-   +'<h2>新建网站</h2><div class="card"><input id="sname" placeholder="站点名，如 blog"><div style="margin-top:9px"><button onclick="createSite()">创建站点</button></div><div class="tip">创建后目录在持久卷 www/站点名，并自动配置 nginx</div></div><pre id="sout" class="hide"></pre>';
+  var rows = s.length ? s.map(function(x){
+    var dom = (x.domains&&x.domains.length)?x.domains.join(", "):"未绑定域名";
+    return '<div class="card" style="margin-bottom:9px"><div class="row"><span class="k">'+esc(x.name)+'</span><span class="pill '+(x.running?"ok":"err")+'">'+(x.running?"运行":"停")+'</span></div>'
+      +'<div class="row"><span class="k">域名</span><span class="v dim">'+esc(dom)+'</span></div>'
+      +'<div class="row"><span class="k">SSL</span><span class="v">'+(x.ssl?'<span class="ok">已开启</span>':'<span class="dim">未开启</span>')+'</span></div>'
+      +'<div class="row"><span class="k">反向代理</span><span class="v">'+(x.proxy?'<span class="ok">是</span>':'<span class="dim">否</span>')+'</span></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+      +'<button class="sec sm" data-act="domain" data-name="'+esc(x.name)+'">绑定域名</button>'
+      +'<button class="sec sm" data-act="ssl" data-name="'+esc(x.name)+'">开 SSL</button>'
+      +'<button class="sec sm" data-act="proxy" data-name="'+esc(x.name)+'">反代</button>'
+      +'<button class="sec sm" data-act="del" data-name="'+esc(x.name)+'">删除</button>'
+      +'</div></div>';
+  }).join("") : '<div class="card dim">暂无站点，下面新建一个</div>';
+  return '<h2>网站 ('+s.length+')</h2>'+rows
+   +'<h2>新建网站</h2><div class="card"><input id="sname" placeholder="站点名，如 blog"><div style="margin-top:9px"><button id="siteNew">创建站点</button></div><div class="tip">创建后目录在持久卷 www/站点名，自动生成 nginx 配置</div></div>'
+   +'<pre id="sout" class="hide"></pre>';
+}
+function bindSiteActions(){
+  var nb=document.getElementById("siteNew"); if(nb) nb.onclick=createSite;
+  document.querySelectorAll("button[data-act]").forEach(function(b){
+    b.onclick=function(){ siteAct(b.getAttribute("data-act"), b.getAttribute("data-name")); };
+  });
+}
+async function siteAct(act,name){
+  var el=document.getElementById("sout");
+  if(!el) return;
+  if(act==="del"){ if(!confirm("确认删除站点 "+name+"?"))return; }
+  var body=null,url="";
+  if(act==="domain"){ var d=prompt("输入要绑定的域名，如 blog.example.com"); if(!d)return; body={name:name,domain:d}; url="/api/panel/site_add_domain"; }
+  else if(act==="ssl"){ body={name:name,enable:true}; url="/api/panel/site_ssl"; }
+  else if(act==="proxy"){ var t=prompt("输入后端地址，如 http://127.0.0.1:8080"); if(!t)return; body={name:name,target:t}; url="/api/panel/site_proxy"; }
+  else if(act==="del"){ body={name:name}; url="/api/panel/site_delete"; }
+  el.classList.remove("hide"); el.textContent="执行中…";
+  var r=await api(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  el.textContent=JSON.stringify(r,null,2);
+  var rl=await api("/api/panel/nginx_reload",{method:"POST"});
+  el.textContent += "\n\nnginx: "+JSON.stringify(rl);
+  await load();
 }
 async function createSite(){
-  var n=document.getElementById('sname').value.trim();if(!n)return;
-  var r=await api('/api/panel/site_create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
-  var el=document.getElementById('sout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2);load();
+  var n=document.getElementById("sname").value.trim(); if(!n)return;
+  var r=await api("/api/panel/site_create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n})});
+  var el=document.getElementById("sout"); el.classList.remove("hide"); el.textContent=JSON.stringify(r,null,2);
+  await load();
 }
 function dbHTML(d){
   var rows=d.length?d.map(function(x){return '<div class="row"><span class="k">'+esc(x)+'</span><span class="v dim" onclick="dbTables('+JSON.stringify(x)+')">查看表</span></div>'}).join(''):'<div class="dim">暂无数据库</div>';
@@ -582,33 +620,38 @@ class H(BaseHTTPRequestHandler):
                 self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
             elif p.path.startswith("/api/panel/"):
                 sub = p.path[len("/api/panel/"):]
-                if sub == "ping": self._send(agent_get("/api/ping"))
-                elif sub == "overview": self._send(agent_get("/api/overview"))
-                elif sub == "services": self._send(agent_get("/api/services"))
-                elif sub == "sites": self._send(agent_get("/api/sites"))
-                elif sub == "databases": self._send(agent_get("/api/databases"))
-                elif sub == "tables": self._send(agent_get("/api/tables?db=" + urllib.parse.quote(g("db",""))))
-                elif sub == "dbquery": self._send(agent_get("/api/dbquery?q=" + urllib.parse.quote(g("q",""))))
-                elif sub == "procs": self._send(agent_get("/api/procs"))
-                elif sub == "containers": self._send(agent_get("/api/containers"))
+                def _body():
+                    n = int(self.headers.get("Content-Length", 0))
+                    return json.loads(self.rfile.read(n).decode("utf-8","ignore") if n else "{}")
+                GET_MAP = {
+                    "ping": "/api/ping", "overview": "/api/overview", "services": "/api/services",
+                    "sites": "/api/sitelist", "sitelist": "/api/sitelist",
+                    "databases": "/api/databases", "procs": "/api/procs",
+                    "containers": "/api/containers", "cron": "/api/cron", "nginx_test": "/api/nginx_test",
+                }
+                POST_MAP = {
+                    "site_create": "/api/site_create", "site_add_domain": "/api/site_add_domain",
+                    "site_ssl": "/api/site_ssl", "site_proxy": "/api/site_proxy",
+                    "site_delete": "/api/site_delete", "nginx_reload": "/api/nginx_reload",
+                    "cron_add": "/api/cron_add", "backup": "/api/backup",
+                    "run_container": "/api/run_container",
+                }
+                if sub in GET_MAP:
+                    self._send(agent_get(GET_MAP[sub]))
+                elif sub == "tables":
+                    self._send(agent_get("/api/tables?db=" + urllib.parse.quote(g("db",""))))
+                elif sub == "dbquery":
+                    self._send(agent_get("/api/dbquery?q=" + urllib.parse.quote(g("q",""))))
                 elif sub == "ls":
                     self._send(agent_get("/api/ls?p=" + urllib.parse.quote(g("p",""))))
                 elif sub == "read":
                     self._send(agent_get("/api/read?p=" + urllib.parse.quote(g("p",""))))
+                elif sub in POST_MAP:
+                    self._send(agent_post(POST_MAP[sub], _body()))
                 elif sub == "sh":
-                    n = int(self.headers.get("Content-Length", 0))
-                    body = self.rfile.read(n).decode("utf-8","ignore") if n else "{}"
-                    self._send(agent_post("/api/sh", json.loads(body or "{}")))
-                elif sub == "run_container":
-                    n = int(self.headers.get("Content-Length", 0))
-                    body = self.rfile.read(n).decode("utf-8","ignore") if n else "{}"
-                    self._send(agent_post("/api/run_container", json.loads(body or "{}")))
-                else: self._send({"error":"unknown"})
-            elif p.path=="/status":
-                self.send_response(302)
-                self.send_header("Location", "/panel")
-                self.send_header("Cache-Control","no-store")
-                self.end_headers()
+                    self._send(agent_post("/api/sh", _body()))
+                else:
+                    self._send({"error": "unknown: " + sub})
             elif p.path=="/api/status":
                 st=status()
                 try: st["cloud"]=json.loads(subprocess.run(["python3","/root/cloudmode.py"],capture_output=True,text=True,timeout=25).stdout.strip())

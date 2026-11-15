@@ -103,6 +103,97 @@ def backup():
     size = os.path.getsize(tarf) if os.path.exists(tarf) else 0
     return {"ok": rc == 0, "file": tarf, "size": size, "mysql_dump": sqlfile if os.path.exists(sqlfile) else ""}
 
+
+# ============ 域名绑定 / SSL / 反向代理 / 站点管理 ============
+def site_list():
+    """完整站点信息：含域名、端口、SSL、状态"""
+    out = []
+    vh_dir = os.path.join(PEND, "conf", "sites")
+    if not os.path.isdir(vh_dir): return out
+    for f in sorted(os.listdir(vh_dir)):
+        if not f.endswith(".conf"): continue
+        path = os.path.join(vh_dir, f)
+        try: txt = open(path, encoding="utf-8", errors="ignore").read()
+        except Exception: continue
+        name = f[:-5]
+        domains = re.findall(r"server_name\s+([^;]+);", txt)
+        ports = re.findall(r"listen\s+(\d+)", txt)
+        rootm = re.search(r"root\s+([^;]+);", txt)
+        ssl_on = "ssl_certificate" in txt
+        proxy = "proxy_pass" in txt
+        out.append({
+            "name": name, "file": path,
+            "domains": [d.strip() for d in (domains[0].split() if domains else [])],
+            "ports": ports, "root": rootm.group(1) if rootm else "",
+            "ssl": ssl_on, "proxy": proxy,
+            "running": "listen" in txt
+        })
+    return out
+
+def site_add_domain(name, domain):
+    """给站点绑定域名"""
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    d = re.sub(r"[^A-Za-z0-9._-]", "", domain)[:80]
+    if not n or not d: return {"ok": False, "error": "参数无效"}
+    path = os.path.join(PEND, "conf", "sites", n + ".conf")
+    if not os.path.exists(path): return {"ok": False, "error": "站点不存在"}
+    txt = open(path, encoding="utf-8").read()
+    m = re.search(r"server_name\s+([^;]+);", txt)
+    if m:
+        cur = m.group(1).strip()
+        if d in cur.split(): return {"ok": True, "msg": "已存在"}
+        txt = txt.replace(m.group(0), "server_name " + cur + " " + d + ";")
+    else:
+        txt = txt.replace("server {", "server {\n  server_name " + d + ";")
+    open(path, "w", encoding="utf-8").write(txt)
+    return {"ok": True, "name": n, "domains": d, "need_reload": True}
+
+def site_ssl(name, enable=True):
+    """站点 SSL（自签证书，内网用）"""
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    path = os.path.join(PEND, "conf", "sites", n + ".conf")
+    if not os.path.exists(path): return {"ok": False, "error": "站点不存在"}
+    ssl_dir = os.path.join(PEND, "ssl")
+    os.makedirs(ssl_dir, exist_ok=True)
+    crt, key = os.path.join(ssl_dir, n + ".crt"), os.path.join(ssl_dir, n + ".key")
+    if enable and not os.path.exists(crt):
+        rc, out = sh("openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout " + key + " -out " + crt +
+                     " -subj \"/CN=" + n + "\" 2>&1", 30)
+        if rc != 0: return {"ok": False, "error": "生成证书失败: " + out[:150]}
+    txt = open(path, encoding="utf-8").read()
+    if enable and "ssl_certificate" not in txt:
+        txt = txt.replace("listen 127.0.0.1:8080;",
+                          "listen 127.0.0.1:8443 ssl;\n  ssl_certificate " + crt + ";\n  ssl_certificate_key " + key + ";")
+        open(path, "w", encoding="utf-8").write(txt)
+    return {"ok": True, "name": n, "ssl": enable, "cert": crt if enable else ""}
+
+def site_proxy(name, target):
+    """反向代理：站点转发到指定后端"""
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    t = re.sub(r"[^A-Za-z0-9.:/_-]", "", target)[:120]
+    if not n or not t: return {"ok": False, "error": "参数无效"}
+    path = os.path.join(PEND, "conf", "sites", n + ".conf")
+    if not os.path.exists(path): return {"ok": False, "error": "站点不存在"}
+    txt = open(path, encoding="utf-8").read()
+    if "proxy_pass" not in txt:
+        txt = re.sub(r"location / \{[^}]*\}",
+                     "location / {\n    proxy_pass " + t + ";\n    proxy_set_header Host $host;\n    proxy_set_header X-Real-IP $remote_addr;\n  }", txt)
+        open(path, "w", encoding="utf-8").write(txt)
+    return {"ok": True, "name": n, "proxy": t}
+
+def site_delete(name):
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    if not n: return {"ok": False, "error": "参数无效"}
+    vh = os.path.join(PEND, "conf", "sites", n + ".conf")
+    if os.path.exists(vh): os.remove(vh)
+    return {"ok": True, "deleted": n}
+
+def nginx_reload():
+    rc, out = sh("sudo -n nginx -t 2>&1 | tail -2", 15)
+    if rc != 0: return {"ok": False, "error": out[:200]}
+    rc2, out2 = sh("sudo -n nginx -s reload 2>&1", 15)
+    return {"ok": rc2 == 0, "out": (out + out2)[:300]}
+
 def overview():
     rc, up = sh("cat /proc/uptime")
     up_s = float(up.split()[0]) if rc == 0 and up.split() else 0
@@ -185,6 +276,8 @@ class H(BaseHTTPRequestHandler):
             return self._s(200, {"ok": True, "host": overview()["host"], "uptime": int(time.time()-START)})
         if not self._ok(q): return self._s(401, {"error": "bad token"})
         try:
+            if p == "/api/sitelist": return self._s(200, site_list())
+            if p == "/api/nginx_test": return self._s(200, nginx_reload())
             if p == "/api/sites": return self._s(200, sites())
             if p == "/api/databases": return self._s(200, db_list())
             if p == "/api/tables":
@@ -241,6 +334,20 @@ class H(BaseHTTPRequestHandler):
                 os.makedirs(os.path.dirname(f), exist_ok=True)
                 open(f, "w", encoding="utf-8").write(d.get("content", ""))
                 return self._s(200, {"ok": True, "path": f})
+            if p == "/api/site_add_domain":
+                d = json.loads(body) if body else {}
+                return self._s(200, site_add_domain(d.get("name",""), d.get("domain","")))
+            if p == "/api/site_ssl":
+                d = json.loads(body) if body else {}
+                return self._s(200, site_ssl(d.get("name",""), d.get("enable",True)))
+            if p == "/api/site_proxy":
+                d = json.loads(body) if body else {}
+                return self._s(200, site_proxy(d.get("name",""), d.get("target","")))
+            if p == "/api/site_delete":
+                d = json.loads(body) if body else {}
+                return self._s(200, site_delete(d.get("name","")))
+            if p == "/api/nginx_reload":
+                return self._s(200, nginx_reload())
             if p == "/api/site_create":
                 d = json.loads(body) if body else {}
                 return self._s(200, site_create(d.get("name","")))
