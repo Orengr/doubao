@@ -35,26 +35,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 
 <div class="sec">控制台</div>
 <div class="grid">
-  <a class="tile primary" href="/lite/">
+  <a class="tile primary" href="/lite/?v=2">
     <div class="ico">⌘</div><div class="t">Moin 控制台</div>
     <div class="d">短信登录 / 保活 / 会话 / 哨兵</div>
     <span class="badge ok" id="b-lite">检测</span>
   </a>
-  <a class="tile" href="/api/status">
+  <a class="tile" href="/status?v=2">
     <div class="ico">◈</div><div class="t">状态接口</div>
-    <div class="d">机器可读的运行状态</div>
+    <div class="d">可读运行状态页</div>
     <span class="badge ok" id="b-api">检测</span>
   </a>
 </div>
 
 <div class="sec">沙箱服务</div>
 <div class="grid">
-  <a class="tile" href="/panel/go" id="panelTile">
+  <a class="tile" href="/panel/go?v=2" id="panelTile">
     <div class="ico">▦</div><div class="t">1Panel 面板</div>
     <div class="d">建站 / 数据库 / 文件</div>
     <span class="badge warn" id="b-panel">检测</span>
   </a>
-  <a class="tile" href="/dl/">
+  <a class="tile" href="/dl/?v=2">
     <div class="ico">⇩</div><div class="t">文件下载</div>
     <div class="d">部署包 / 交接文档</div>
     <span class="badge ok" id="b-dl">检测</span>
@@ -101,7 +101,7 @@ async function probe(url){
 async function refresh(){
   const items=[
     ['/lite/','b-lite','Moin 控制台'],
-    ['/api/status','b-api','状态接口'],
+    ['/status','b-api','状态接口'],
     ['/panel/go','b-panel','1Panel 面板'],
     ['/dl/','b-dl','文件下载']
   ];

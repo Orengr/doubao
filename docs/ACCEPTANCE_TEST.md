@@ -209,3 +209,14 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 - status：logged=True svc=active ka=active watch=active sess=12 panel=/cSK41ajJX5 cloud=云电脑
 - 沙箱 17800/ping ok(uptime 241)，frps 两 proxy online，1Panel 登录页经 IP 直达
 - 端口：对外仅 80；17800/18090/7000 是 frps 隧道监听，18800/9222/7501 本地
+
+
+## v9 修复（2026-11-16 00:15，逐项亲自点击验证）
+### 用户 4 问的实测结论
+1. **1Panel 归属**：18090 由服务器 frps 监听并转发到**豆包沙箱**（17800/ping 返回 host=vefaas-…sandbox，1panel-data 在沙箱 10T 卷 /home/user/.dsh_pend/1panel-data）。阿里服务器只跑 frps/nginx/管理台，**1Panel 是沙箱装的**。
+2. **点 1Panel 空白**：真前端 loading 页引用 /assets/js/…（根路径），经 80 时曾落 location / 返回导航页 HTML 导致白屏；nginx /assets/→18090 已生效，现 JS 3.2MB text/javascript、CSS text/css 全 200，白屏消除。
+3. **状态接口显示裸 JSON**：磁贴原来直链 /api/status。改为磁贴指向 /status 可读页（nginx 补 location = /status → 18800），页内渲染登录态/保活/哨兵/会话数/模式/入口等，仍保留 /api/status 供机器读。
+4. **文件下载回控制台界面**：/dl/ 原先 alias /var/www/html（撞上导航页 index.html）。改为独立目录 /var/www/dl（autoindex on），已放入 HANDOVER.md/README.md/pkg.tar.gz/frp.tar.gz/1panel.tar.gz，实测列出文件名。
+### 附带
+- 导航页磁贴 href 加 ?v=2 禁缓存；/status 由 nginx location = 精确代理。
+- 逐项实测：/ 200、/status 标题「运行状态」、/panel/go→loading、/dl/ 列文件、assets JS/CSS 200、7 服务 active。

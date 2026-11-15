@@ -34,33 +34,14 @@ def sessions_with_status():
     out.sort(key=lambda x:(not x["keep"], x["name"]))
     return out
 
-PANEL_TOKEN = "oms2rROVaDd8t8s9jWIYKBW1eYREoQbu"
-PANEL_FALLBACK = "/cSK41ajJX5"
-
-def panel_entrance():
-    # 从沙箱持久卷读入口（控制面 /get 带 token）；失败回退缓存值
-    try:
-        url = "http://127.0.0.1:17800/get?token=" + PANEL_TOKEN + "&p=/home/user/.dsh_pend/state/panel_entrance.txt"
-        r = urllib.request.urlopen(url, timeout=8)
-        e = r.read().decode("utf-8","ignore").strip()
-        if e.startswith("/") and len(e) < 40: return e
-    except Exception: pass
-    return PANEL_FALLBACK
-
 def status():
     st=KEEP.status(); ss=sessions_with_status(); st["sessions"]=ss
-    # 防假登录：会话列表读不出来（ERR/空）就视为未登录
-    if ss and ss[0]["id"]=="ERR":
-        st["account"]=None; st["logged_in"]=False
-    else:
-        st["logged_in"]=bool(st.get("account"))
     # 保活会话名以会话列表实时名字为准（避免账号库缓存旧名）
     if st.get("account") and st["account"].get("keep_conv_id"):
         k=st["account"]["keep_conv_id"]
         hit=next((x for x in ss if x["id"]==k), None)
         if hit: st["account"]["keep_conv_name"]=hit["name"]
     if uid(): st["settings"]=DB.all_settings(uid())
-    st["panel_entrance"] = panel_entrance()
     return st
 
 HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
@@ -93,18 +74,10 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 .modebtn{display:flex;gap:6px}.modebtn button{flex:1}.modebtn button.on{background:#1f6feb}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}
 .sw{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #30363d}
-#convs{max-height:210px;overflow-y:auto;padding-right:4px;-webkit-overflow-scrolling:touch}
-#convs::-webkit-scrollbar{width:5px}#convs::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
-.seg{display:inline-flex;border:1px solid #30363d;border-radius:8px;overflow:hidden;background:#0d1117}
-.seg button{border:0;border-radius:0;background:transparent;color:#8b949e;padding:7px 16px;min-width:92px}
-.seg button.on{background:#1f6feb;color:#fff}
-.topuser{display:flex;align-items:center;gap:8px;font-size:13px}
-.topuser button{padding:5px 10px;font-size:12px}
-.hidden{display:none !important}
 </style></head><body>
-<header><h1>Moin 控制台 <span class="badge">纯接口 · 无扫码</span></h1><div class="topuser" id="topUser">初始化…</div></header>
+<header><h1>Moin 控制台 <span class="badge">纯接口 · 无扫码</span></h1><span id="head" class="dim">初始化…</span></header>
 <main>
-<div class="card" id="loginCard"><h2>① 登录（手机号 + 短信验证码）</h2>
+<div class="card"><h2>① 登录（手机号 + 短信验证码）</h2>
 <div class="row"><input id="phone" placeholder="手机号" value="18053220144"><button onclick="loginSend()">获取验证码</button></div>
 <div class="row"><input id="code" placeholder="6 位验证码"><button onclick="loginVerify()">提交登录</button></div>
 <pre id="loginOut">—</pre></div>
@@ -115,9 +88,8 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <button class="sec" onclick="keepTest()">🧪 保活功能测试</button>
 <span id="keepState2" class="dim"></span></div>
 <pre id="testOut" style="display:none;max-height:120px"></pre>
-<div class="row"><span class="dim" style="min-width:88px">回答模式</span>
-<div class="seg"><button id="m9" onclick="setMode(9)">云电脑</button><button id="m0" onclick="setMode(0)">对话</button></div>
-<span class="tag" id="cloudMode">模式读取中…</span></div></div>
+<div class="row"><div class="modebtn"><button id="m9" onclick="setMode(9)">☁️ 云电脑</button><button id="m0" onclick="setMode(0)">💬 对话</button></div></div>
+<div class="row"><span class="tag" id="cloudMode">模式读取中…</span></div></div>
 
 <div class="card"><h2>③ 会话列表 <span class="dim" style="font-size:12px">点开=查看历史+发消息+等回复</span></h2>
 <div class="row"><button class="sec sm" onclick="newConv()">➕ 新建会话（按命名配置自动重命名）</button></div>
@@ -129,8 +101,8 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <div class="sw"><span>新会话命名前缀</span><input id="rnPrefix" style="max-width:110px" onchange="saveSet('rename_prefix',this.value)"></div>
 <div class="sw"><span>命名后缀样式</span><select id="rnStyle" style="max-width:100px" onchange="saveSet('rename_style',this.value)"><option value="letter">A/B/C</option><option value="number">1/2/3</option></select></div>
 <div class="sw"><span>当前计数</span><span id="rnCounter" class="dim">—</span></div></div>
-<div><div class="sw"><span>小任务保活</span><span class="green">每 3–5 分钟随机一次</span></div>
-<div class="dim" style="font-size:11px;padding:4px 0">固定规则：只发 99 乘法表 / 404 网页等沙箱小任务；隧道哨兵每秒检测、连续 3 秒失败立即拉起，与小任务无关。</div>
+<div><div class="sw"><span>保活任务间隔(秒)</span><input id="keepInt" style="max-width:100px" onchange="saveSet('keep_interval_sec',this.value)"></div>
+<div class="sw"><span>恢复指令间隔(秒)</span><input id="wakeInt" style="max-width:100px" onchange="saveSet('wake_interval_sec',this.value)"></div>
 <div class="sw"><span>死亡关键词</span><input id="deathKw" style="max-width:200px" onchange="saveSet('death_keywords',this.value)"></div>
 <div class="sw"><span>预览下一个名字</span><span id="rnPreview" class="green">—</span></div></div></div></div>
 
@@ -152,16 +124,11 @@ function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':
 async function refreshAll(){
   const st=await api('/api/status'); S.status=st; S.settings=st.settings||{};
   const svc=st.service==='active';
-  const logged=st.logged_in!==false && !!st.account;
-  document.getElementById('topUser').innerHTML=logged
-    ? '<span class="ok">● 当前已登录：'+esc(st.account.name||st.account.uid)+'</span><button class="sec" onclick="logout()">退出登录</button>'
-    : '<span class="bad">● 未登录</span><button class="sec" onclick="document.getElementById(\'loginCard\').classList.remove(\'hidden\')">登录</button>';
-  document.getElementById('loginCard').classList.toggle('hidden', logged);
-  const sub='<span class="dim" style="font-size:11px">小任务:'+(st.ka_pure==='active'?'开':'关')+' · 哨兵:'+(st.tunnel_watch==='active'?'开':'关')+'</span>';
-  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>')+' '+sub;
+  document.getElementById('head').innerHTML=st.account?'<span class="ok">● '+esc(st.account.name||st.account.uid)+'</span>':'<span class="bad">● 未登录</span>';
+  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>');
   document.getElementById('keepState').innerHTML='保活 '+ks;
   document.getElementById('keepState2').innerHTML='保活 '+ks;
-  document.getElementById('acct').innerHTML=logged?
+  document.getElementById('acct').innerHTML=st.account?
     '<div>UID <b>'+esc(st.account.uid)+'</b> · '+esc(st.account.phone||'')+'</div>'+
     '<div>保活会话: '+(st.account.keep_conv_id?'<span class="green">'+esc(st.account.keep_conv_name||st.account.keep_conv_id)+'</span>':'<span class="bad">未配置</span>')+'</div>':
     '<span class="bad">未登录</span>';
@@ -181,6 +148,8 @@ async function refreshAll(){
     document.getElementById('autoNew').value=set.auto_new_on_dead;
     document.getElementById('rnPrefix').value=set.rename_prefix||'';
     document.getElementById('rnStyle').value=set.rename_style||'letter';
+    document.getElementById('keepInt').value=set.keep_interval_sec||'';
+    document.getElementById('wakeInt').value=set.wake_interval_sec||'';
     document.getElementById('deathKw').value=set.death_keywords||'';
     document.getElementById('rnCounter').innerText=set.rename_counter||'0';
     document.getElementById('rnPreview').innerText=set.next_name||'—';
@@ -188,8 +157,6 @@ async function refreshAll(){
   const h=await api('/api/history');
   document.getElementById('history').innerHTML=h.map(x=>'<div class="hist" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed #30363d"><span>'+esc(x.name||x.uid)+' · '+esc(x.phone||'')+'</span><span class="dim">'+new Date(x.at*1000).toLocaleString()+'</span></div>').join('')||'无';
 }
-async function logout(){if(!confirm('退出当前登录？退出后可重新用手机号接验证码登录。'))return;await api('/api/logout');refreshAll()}
-async function toggleAlive(cid,to){await api('/api/conv/'+(to?'alive':'dead')+'?cid='+encodeURIComponent(cid));refreshAll()}
 async function saveSet(k,v){await api('/api/setting/set?key='+encodeURIComponent(k)+'&value='+encodeURIComponent(v));refreshAll()}
 async function loginSend(){const r=await fetch('/api/login/send?phone='+encodeURIComponent(document.getElementById('phone').value));document.getElementById('loginOut').innerText=await r.text()}
 async function loginVerify(){
@@ -232,28 +199,6 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/":
                 b=HTML.encode();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8")
                 self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
-            elif p.path=="/api/logout":
-                # 退出登录：停保活/哨兵，清空 active 与浏览器 cookie；保留账号库/历史/配置
-                KEEP.stop_all()
-                try: os.remove(ACTIVE_F)
-                except Exception: pass
-                try:
-                    import websocket as _ws
-                    v = json.loads(urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=5).read())
-                    w = _ws.create_connection(v["webSocketDebuggerUrl"], timeout=10)
-                    w.send(json.dumps({"id":1,"method":"Storage.clearCookies"}))
-                    while True:
-                        if json.loads(w.recv()).get("id")==1: break
-                    w.close()
-                except Exception: pass
-                log.info("logout done")
-                self._send({"ok":True})
-            elif p.path=="/panel/go":
-                e = panel_entrance()
-                self.send_response(302)
-                self.send_header("Location", "/panel" + e)
-                self.send_header("Cache-Control","no-store")
-                self.end_headers()
             elif p.path=="/api/status":
                 st=status()
                 try: st["cloud"]=json.loads(subprocess.run(["python3","/root/cloudmode.py"],capture_output=True,text=True,timeout=25).stdout.strip())
@@ -298,14 +243,10 @@ class H(BaseHTTPRequestHandler):
                 try: self._send(open("/root/keep_test_result.json").read(), raw=True)
                 except Exception: self._send('{"ok":false,"results":[]}', raw=True)
             elif p.path=="/api/keep/stop":
-                self._send(KEEP.stop_all())
-            elif p.path=="/api/keep/start":
-                self._send(KEEP.start_all())
+                subprocess.run(["systemctl","stop","ka-pure"],capture_output=True);self._send({"ok":True})
             elif p.path=="/api/conv/messages":
                 msgs=API.single(g("cid"),30)
-                self._send([{"me":m.get("sender_id")=="2328113677082323",
-                             "text":m.get("tts_content") or m.get("content") or "",
-                             "time":int(m.get("create_time") or 0)} for m in msgs])
+                self._send([{"me":m.get("sender_id")=="2328113677082323","text":(m.get("tts_content") or "")[:300]} for m in msgs])
             elif p.path=="/api/conv/status":
                 cv=DB.get_conv(uid(),g("cid"));acc=DB.get_account(uid()) if uid() else None
                 cv["keep"]=(acc and acc["keep_conv_id"]==g("cid"));self._send(cv)
@@ -319,7 +260,7 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/api/conv/rename":
                 API.rename(g("cid"),g("name"));DB.upsert_conv(uid(),g("cid"),name=g("name"));self._send({"ok":True})
             elif p.path=="/api/conv/new":
-                name=DB.next_conv_name(uid());new=API.create_conv_by_send(name)
+                name=DB.next_conv_name(uid());new=API.create_conv_by_ui(name)
                 if new["conversation_id"]: DB.upsert_conv(uid(),new["conversation_id"],name,alive=1)
                 self._send(new)
             else: self.send_response(404);self.end_headers()
