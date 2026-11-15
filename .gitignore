@@ -27,3 +27,7 @@ SANDBOX_CMDS.txt
 !bt_res/
 !bt_res/*.tar.gz
 !pkg.tar.gz
+
+# 真实凭证，绝不提交
+ck_live_backup.txt
+doubao_account_device_profile.json
