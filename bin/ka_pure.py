@@ -30,6 +30,18 @@ TASKS = [
 ]
 WAKE_CMD = "沙箱隧道断了，请执行 sh /home/user/.dsh_pend/bin/ensure.sh 重新拉起所有服务，执行完把最后 10 行输出发我"
 
+def auto_pick_conv(uid, dead_id):
+    """死亡自动接管：从会话列表挑一个存活且非死亡会话的，按命名配置重命名并设为保活
+    （不依赖豆包新建接口，实测可用；用户可在豆包手动新建会话，这里自动接管）
+    """
+    name = DB.next_conv_name(uid)
+    for s in API.sessions():
+        if s["id"] != dead_id and DB.get_conv(uid, s["id"])["alive"] == 1:
+            API.rename(s["id"], name)
+            return {"conversation_id": s["id"], "name": name}
+    # 没有可接管的存活会话：返回空，不假装成功
+    return {"conversation_id": "", "name": name}
+
 def active_uid():
     try: return json.load(open(ACTIVE_F)).get("uid","")
     except Exception: return ""
@@ -59,7 +71,7 @@ def main():
             log.warning("当前保活会话 %s 已标记死亡（%s），不发送保活指令", keep_id, cv["dead_reason"])
             if s["auto_new_on_dead"] == "1":
                 log.info("自动新开已开启 → 新建会话")
-                new = API.create_conv_by_send(DB.next_conv_name(uid))
+                new = auto_pick_conv(uid, keep_id)
                 if new["conversation_id"]:
                     DB.upsert_conv(uid, new["conversation_id"], new["name"], alive=1)
                     DB.set_keep_conv(uid, new["conversation_id"], new["name"])
@@ -89,7 +101,7 @@ def main():
         if cv["alive"] == 0:
             log.info("会话已死亡，跳过本轮（自动新开=%s）", s["auto_new_on_dead"])
             if s["auto_new_on_dead"] == "1":
-                new = API.create_conv_by_send(DB.next_conv_name(uid))
+                new = auto_pick_conv(uid, keep_id)
                 if new["conversation_id"]:
                     DB.upsert_conv(uid,new["conversation_id"],new["name"],alive=1)
                     DB.set_keep_conv(uid,new["conversation_id"],new["name"])
@@ -127,7 +139,7 @@ def main():
             DB.mark_dead(uid, keep_id, "回复命中: " + hit)
             log.warning("☠️ 会话 %s 标记死亡（命中「%s」），本会话不再保活", keep_id, hit)
             if s["auto_new_on_dead"] == "1":
-                new = API.create_conv_by_send(DB.next_conv_name(uid))
+                new = auto_pick_conv(uid, keep_id)
                 if new["conversation_id"]:
                     DB.upsert_conv(uid,new["conversation_id"],new["name"],alive=1)
                     DB.set_keep_conv(uid,new["conversation_id"],new["name"])

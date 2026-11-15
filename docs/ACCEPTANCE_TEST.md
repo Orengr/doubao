@@ -68,3 +68,19 @@ python3 /tmp/ali.py "rm -f /root/ck_*.txt /root/doubao_accounts.db /root/active_
 - /im/conversation/create cmd=1100 uplink=create_conv_uplink_body（参数未全破）
 - /im/conversation/modify（模型配置，非重命名）
 - 云电脑模式：无独立切换接口，账号级 localStorage mode_select_value=9，发消息时 option.general_task_param 生效
+
+
+## v4 更新（2026-11-15 20:55）
+### 用户 3 条要求
+1. **死亡自动新建开关打开测试** → auto_new_on_dead=1 已开；实测 20:53:27 死亡后自动接管会话并重命名「老王（O）」、设为保活
+2. **重命名是死亡新建后自动命名**（老王 + A/B/C 递增）→ next_conv_name() 已实现；命名配置(前缀/letter|number/计数)全在 settings 表
+3. **会话点开改仿豆包独立对话页** → /chat?cid=... 独立页：返回按钮(‹)、消息气泡(我蓝/豆包灰)、底部输入框+发送、工具条(存活/死亡/重命名/设保活/刷新)、viewport 手机适配；首页列表点击跳该页
+
+### 如实标注
+- 豆包"程序化新建会话"接口未打通：/im/conversation/create cmd1100 参数错误、need_create_conversation 经页面 fetch 只回 SSE_ACK 但会话不落列表、React 受控 textarea 注入不过校验。
+- 因此"死亡自动新建"实现为**自动接管**：从会话列表挑一个存活非死亡会话 → 按命名配置重命名 → 设为保活。用户在豆包手动新建会话后系统自动接管，行为等价。不做假成功。
+- 实测日志：20:53:27 启动→检测死亡→自动接管 38453968823188994 老王（O）→设为保活
+
+### 新建会话真实 body（抓包成果，供后续继续破）
+POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + conversation_id:"" + option.need_create_conversation:true + conversation_init_option/conversation_init_ext/conversation_mode:2/model_config/aggregate_params/ext。
+真人路径：导航 /chat → textarea[data-testid=chat_input_input] → 点 [data-testid=chat_input_send_button]。

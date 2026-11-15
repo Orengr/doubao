@@ -118,12 +118,88 @@ def create_conv(name=""):
     return out
 
 def create_conv_by_send(name):
-    """新建会话：优先接口；接口不通则明确返回失败（前端提示用户手动新建）
-    注：豆包新建会话由发首条消息触发，管理台会自动从 recent_conv 读到并可重命名。
+    """新建会话：按抓到的真实首条消息 body 构造（local_conversation_id + conversation_init_option 等）
+    发成功后从 SSE 取 conversation_id，并立即按配置重命名。
     """
-    return {"conversation_id":"", "name":name,
-            "need_manual": True,
-            "hint":"豆包新会话需在页面发首条消息创建；创建后管理台自动读取，点会话可重命名/设保活"}
+    js = r"""
+(async()=>{
+  const ck=Object.fromEntries(document.cookie.split('; ').map(s=>{const i=s.indexOf('=');return[s.slice(0,i),s.slice(i+1)];}));
+  const tea=JSON.parse(localStorage.getItem('__tea_cache_tokens_497858')||'{}');
+  const sam=JSON.parse(localStorage.getItem('samantha_web_web_id')||'{}');
+  const device_id=sam.web_id||'7707456447802197504', web_id=tea.web_id||device_id;
+  const p=new URLSearchParams({aid:'497858',device_id:device_id,device_platform:'web',doubao_device_platform:'web',doubao_pc_version:'3.45.7',fp:ck['s_v_web_id']||'',language:'zh',pc_version:'3.45.7',pkg_type:'release_version',real_aid:'497858',region:'CN',samantha_web:'1',sys_region:'CN',tea_uuid:web_id,tz_name:'Asia/Shanghai','use-olympus-account':'1',version_code:'20800',web_id:web_id,web_platform:'browser',web_tab_id:crypto.randomUUID(),msToken:ck['msToken']||''});
+  const localId='local_'+Date.now()+Math.floor(Math.random()*1000);
+  const mid=crypto.randomUUID(), uid=crypto.randomUUID(), bid=crypto.randomUUID();
+  const agentTask={runtime_type:1,folder_name:'',device_name:'',workspace:'',local_app_id:'',local_device_id:''};
+  const body={client_meta:{local_conversation_id:localId,conversation_id:'',bot_id:'7338286299411103781',last_section_id:'',last_message_index:null,local_permissions:[{permission_name:'ACCESS_COARSE_LOCATION',status:3},{permission_name:'ACCESS_FINE_LOCATION',status:3},{permission_name:'ACCESS_BACKGROUND_LOCATION',status:3}]},messages:[{local_message_id:mid,content_block:[{block_type:10000,content:{text_block:{text:'新会话初始化',icon_url:'',icon_url_dark:'',summary:''},pc_event_block:''},block_id:bid,parent_id:'',meta_info:[],extra_info:{},append_fields:[]}],message_status:0}],option:{send_message_scene:'',create_time_ms:Date.now(),collect_id:'',is_audio:false,answer_with_suggest:false,agent_mode:1,tts_switch:false,need_deep_think:9,click_clear_context:false,from_suggest:false,is_regen:false,is_replace:false,is_from_click_option:false,is_from_click_softlink:false,disable_sse_cache:false,select_text_action:'',is_select_text:false,resend_for_regen:false,scene_type:0,unique_key:uid,start_seq:0,need_create_conversation:true,conversation_init_option:{project_id:'',need_ack_conversation:true},conversation_init_ext:{agent_task_param:JSON.stringify(agentTask),model_item_key:'9',reasoning_effort:'3',mode_id:'3'},regen_query_id:[],edit_query_id:[],regen_instruction:'',no_replace_for_regen:false,message_from:0,shared_app_name:'',shared_app_id:'',sse_recv_event_options:{support_chunk_delta:true},support_lazy_fetch_stream:true,is_ai_playground:false,is_old_user:true,general_task_param:{action:0,thread_local_message_id:[mid],project_id:'',runtime_type:1,agent_task_param:agentTask,server_do_compare:true},queue_client_state:{queue_enabled:true,queue_is_empty:true,queue_submit_mode:2},recovery_option:{is_recovery:false,req_create_time_sec:Math.floor(Date.now()/1000),append_sse_event_scene:0},message_storage_type:0,related_deleted_message_ids:{},connector_info_list:[],model_config:{model_item_key:'9',model_extra_params:{total_window_size:'256000'},reasoning_effort:3},aggregate_params:{mention_skill_list:'[]',mention_plugin_list:'[]',mention_ext:'[{}]',conversation_mode:'2',mode_id:'3',model_item_key:'9',agent_mode:'1',reasoning_effort:'3',provider_id:''},conversation_mode:2},user_context:[],ext:{general_task_param:JSON.stringify({action:0,thread_local_message_id:[mid],project_id:'',runtime_type:1,agent_task_param:agentTask,server_do_compare:true}),use_deep_think:'9',agent_mode:'1',conversation_init_option:JSON.stringify({project_id:'',need_ack_conversation:true}),sub_conv_firstmet_type:'1',collection_id:'',is_finish:'1',commerce_credit_config_enable:'0'}};
+  const r=await fetch('/chat/completion?'+p.toString(),{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','Agw-Js-Conv':'str, str','Accept':'text/event-stream'},body:JSON.stringify(body)});
+  return await r.text();
+})()
+"""
+    # 真人路径：先切到新对话页 /chat，再发首条消息（否则会进无状态通道）
+    w = websocket.create_connection(page_ws(), timeout=30)
+    w.send(json.dumps({"id": 9, "method": "Page.navigate", "params": {"url": "https://www.doubao.com/chat"}}))
+    time.sleep(1)
+    w.close()
+    time.sleep(7)
+    old_ids = {x["id"] for x in sessions()}
+    sse = page_eval(js, 100) or ""
+    # 新会话由首条消息创建；SSE 里的数字 ID 不是会话 ID，重新拉列表找新增的
+    cid = ""
+    for _ in range(6):
+        time.sleep(3)
+        for x in sessions():
+            if x["id"] not in old_ids and (x["name"] in ("新会话初始化", "(未命名)", "") or x["id"] not in old_ids):
+                cid = x["id"]; break
+        if cid: break
+    if cid and name:
+        rename(cid, name)
+    return {"conversation_id":cid, "name":name, "sse_head":sse[:160],
+            "need_manual": not bool(cid),
+            "hint":"" if cid else "新建后未从会话列表找到新会话，请在豆包页面发首条消息创建；管理台自动读取后可重命名/设保活"}
+
+def create_conv_by_ui(name):
+    """真人路径新建会话：/chat → insertText → 动态找发送按钮 → 点击 → 列表定位 → 重命名"""
+    w = websocket.create_connection(page_ws(), timeout=60)
+    w.send(json.dumps({"id":1,"method":"Page.navigate","params":{"url":"https://www.doubao.com/chat"}}))
+    time.sleep(8)
+    old_ids = {x["id"] for x in sessions()}
+    def c(i, method, params=None, wait=20):
+        w.send(json.dumps({"id":i,"method":method,"params":params or {}}))
+        end=time.time()+wait
+        while time.time()<end:
+            r=json.loads(w.recv())
+            if r.get("id")==i: return r
+    # 聚焦 textarea 并用 insertText（比逐字 char 可靠）
+    # React 受控 textarea：用 native setter + input 事件注入文字
+    c(2,"Runtime.evaluate",{"expression":"""
+(()=>{const t=document.querySelector('[data-testid=chat_input_input]');if(!t)return 'NO';
+const s=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;
+s.call(t,'新会话初始化');t.dispatchEvent(new Event('input',{bubbles:true}));t.focus();return t.value})()
+""","returnByValue":True})
+    time.sleep(1)
+    # 动态查发送按钮坐标
+    r=c(4,"Runtime.evaluate",{"expression":"""
+(()=>{const e=document.querySelector('[data-testid=chat_input_send_button]');if(!e)return '';const b=e.getBoundingClientRect();return Math.round(b.x+b.width/2)+','+Math.round(b.y+b.height/2)})()
+""","returnByValue":True})
+    pos=r.get("result",{}).get("result",{}).get("value") or ""
+    if not pos:
+        w.close(); return {"conversation_id":"","name":name,"need_manual":True,"hint":"发送按钮未出现（输入未生效）"}
+    x,y=map(int,pos.split(","))
+    c(5,"Input.dispatchMouseEvent",{"type":"mousePressed","x":x,"y":y,"button":"left","clickCount":1})
+    c(6,"Input.dispatchMouseEvent",{"type":"mouseReleased","x":x,"y":y,"button":"left","clickCount":1})
+    w.close()
+    cid=""
+    for _ in range(6):
+        time.sleep(3)
+        for item in sessions():
+            if item["id"] not in old_ids:
+                cid=item["id"]; break
+        if cid: break
+    if cid and name: rename(cid, name)
+    return {"conversation_id":cid,"name":name,
+            "need_manual": not bool(cid),
+            "hint":"" if cid else "UI 新建后未从列表找到新会话"}
 
 # ---- 死亡检测 ----
 def death_check(sse_text, keywords):

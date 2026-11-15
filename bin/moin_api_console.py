@@ -8,6 +8,7 @@ import accounts_db as DB
 import login_api as LOGIN
 import keepctl as KEEP
 import conv_api as API
+import chat_page as CHATP
 import cloudmode as CM
 
 PORT=18800; ACTIVE_F="/root/active_account.json"; LOG_F="/root/moin_api_console.log"
@@ -106,19 +107,11 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <p>首次登录，选一个会话用于自动保活；<b>不选也行</b>，保活保持关闭。</p>
 <select id="modalSel"></select><div class="row" style="margin-top:12px"><button onclick="modalSave()">保存并启用</button><button class="sec" onclick="modalSkip()">跳过</button></div></div></div>
 
-<div class="modal" id="chatModal"><div class="box">
-<h2 style="margin-top:0" id="chatTitle">会话</h2>
-<div id="chatMeta" class="dim"></div>
-<div class="chat" id="chatBox">…</div>
-<div class="row"><input id="chatInput" placeholder="输入消息…"><button onclick="chatSend()">发送</button><button class="sec" onclick="chatRefresh()">刷新回复</button>
-<button class="sec sm" onclick="markAlive()">标记存活</button><button class="sec sm" onclick="markDead()">标记死亡</button>
-<button class="sec sm" onclick="renameConv()">重命名</button><button class="sec sm" onclick="setKeepHere()">设为保活</button></div>
-<div class="row"><button class="sec" onclick="closeChat()">关闭</button></div>
-<pre id="chatOut" style="max-height:80px">—</pre>
-</div></div>
+
 
 <script>
 let S={status:{},settings:{},cur:null};
+function goConv(el){location.href='/chat?cid='+encodeURIComponent(el.getAttribute('data-cid'))}
 async function api(p){const r=await fetch(p);return r.json()}
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 async function refreshAll(){
@@ -138,7 +131,7 @@ async function refreshAll(){
   document.getElementById('m9').className=cm.value==='9'?'on':'';document.getElementById('m0').className=cm.value==='0'?'on':'';
   // 会话列表
   document.getElementById('convs').innerHTML=(st.sessions||[]).map(c=>
-    '<div class="conv '+(c.keep?'keep':'')+' '+(c.alive?'':'dead')+'" onclick="openChat(\''+esc(c.id)+'\',\''+esc(c.name).replace(/'/g,"")+'\')">'+
+    '<div class="conv '+(c.keep?'keep':'')+' '+(c.alive?'':'dead')+'" data-cid="'+esc(c.id)+'" onclick="goConv(this)">'+
     '<div><div class="nm">'+esc(c.name)+(c.keep?' <span class="pill keep">保活</span>':'')+'</div><div class="meta">'+esc(c.id)+' · 最后检查 '+(c.checked_at?new Date(c.checked_at*1000).toLocaleTimeString():'未检查')+'</div>'+
     (c.alive?'':'<div class="meta bad">☠️ '+esc(c.dead_reason||'已死亡')+'</div>')+'</div>'+
     '<span class="pill '+(c.alive?'live':'dead')+'">'+(c.alive?'存活':'死亡')+'</span></div>').join('')||'无';
@@ -171,24 +164,6 @@ async function activate(){const d=S.status;if(!d.account){alert('未登录');ret
 async function stopKeep(){await api('/api/keep/stop');refreshAll()}
 async function setMode(v){await api('/api/cloud_mode/set?v='+v);refreshAll()}
 async function newConv(){const d=await api('/api/conv/new');if(d.need_manual){alert(d.hint)}else{alert('新建会话: '+d.conversation_id+' '+d.name)}refreshAll()}
-async function openChat(id,name){S.cur={id,name};document.getElementById('chatTitle').innerText=name;document.getElementById('chatModal').style.display='flex';chatRefresh()}
-async function closeChat(){document.getElementById('chatModal').style.display='none'}
-async function chatRefresh(){
-  const d=await api('/api/conv/messages?cid='+encodeURIComponent(S.cur.id));
-  document.getElementById('chatBox').innerHTML=d.map(m=>'<div class="m '+(m.me?'me':'')+'">'+esc(m.text)+'</div>').join('')||'无消息';
-  const cv=await api('/api/conv/status?cid='+encodeURIComponent(S.cur.id));
-  document.getElementById('chatMeta').innerText='状态: '+(cv.alive?'存活':'死亡 '+(cv.dead_reason||''))+' · '+(cv.keep?'保活会话':'');
-}
-async function chatSend(){
-  const t=document.getElementById('chatInput').value;if(!t)return;
-  const r=await fetch('/api/conv/send?cid='+encodeURIComponent(S.cur.id)+'&text='+encodeURIComponent(t));
-  document.getElementById('chatOut').innerText=await r.text();document.getElementById('chatInput').value='';
-  setTimeout(chatRefresh,4000);
-}
-async function markAlive(){await api('/api/conv/alive?cid='+encodeURIComponent(S.cur.id));chatRefresh();refreshAll()}
-async function markDead(){await api('/api/conv/dead?cid='+encodeURIComponent(S.cur.id));chatRefresh();refreshAll()}
-async function renameConv(){const n=prompt('新会话名',S.cur.name);if(n)await api('/api/conv/rename?cid='+encodeURIComponent(S.cur.id)+'&name='+encodeURIComponent(n));refreshAll()}
-async function setKeepHere(){const d=S.status;if(!d.account)return;await api('/api/keep/set?uid='+encodeURIComponent(d.account.uid)+'&cid='+encodeURIComponent(S.cur.id)+'&name='+encodeURIComponent(S.cur.name));refreshAll()}
 async function loadLog(){const r=await fetch('/api/log');document.getElementById('logbox').innerText=await r.text()}
 refreshAll();loadLog();setInterval(refreshAll,20000);
 </script></body></html>"""
@@ -202,7 +177,10 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         p=urllib.parse.urlparse(self.path);q=urllib.parse.parse_qs(p.query);g=lambda k,d="":q.get(k,[d])[0]
         try:
-            if p.path=="/":
+            if p.path=="/chat":
+                b=CHATP.HTML.encode();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8")
+                self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
+            elif p.path=="/":
                 b=HTML.encode();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8")
                 self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
             elif p.path=="/api/status":
@@ -254,7 +232,7 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/api/conv/rename":
                 API.rename(g("cid"),g("name"));DB.upsert_conv(uid(),g("cid"),name=g("name"));self._send({"ok":True})
             elif p.path=="/api/conv/new":
-                name=DB.next_conv_name(uid());new=API.create_conv_by_send(name)
+                name=DB.next_conv_name(uid());new=API.create_conv_by_ui(name)
                 if new["conversation_id"]: DB.upsert_conv(uid(),new["conversation_id"],name,alive=1)
                 self._send(new)
             else: self.send_response(404);self.end_headers()
