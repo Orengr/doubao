@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ka_pure.py v3 — 保活引擎
-- 目标会话从账号库 keep_conv_id 读
-- 所有间隔/开关/重命名配置从 settings 表读
-- 每次发送后读豆包 SSE 回复，命中死亡关键词 → 标记死亡（一次）、不再保活
-- 死亡自动新开会话（默认关，用户开启才做），新会话按命名配置自动重命名
-- 手动改存活后，下次保活重新读回复，无拒绝词则继续
+"""ka_pure.py v6 — 纯保活引擎（只做沙箱小任务，不检测隧道、不发恢复指令）
+隧道检测与拉起由独立 tunnel_watch.py 负责。
 """
-import sys, time, json, logging, subprocess
+import sys, time, json, logging
 sys.path.insert(0, "/root")
 import accounts_db as DB
 import conv_api as API
@@ -16,136 +12,79 @@ ACTIVE_F = "/root/active_account.json"
 LOG_F = "/root/ka_pure.log"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
     handlers=[logging.FileHandler(LOG_F, encoding="utf-8"), logging.StreamHandler()])
-log = logging.getLogger("ka3")
+log = logging.getLogger("ka6")
 
+# 沙箱内的小任务：保持实例活跃，无恢复、无高风险操作
 TASKS = [
-    "在沙箱 /home/user/.dsh_pend/tasks/ 下创建商品报价表 CSV（至少 8 行），文件名带时间戳 {ts}",
-    "在沙箱写一篇 200 字作文，保存为 essay_{ts}.md 并告诉我路径",
-    "用代码写个简洁的 404 网页，保存到 tasks/404_{ts}.html",
-    "统计 /home/user/.dsh_pend 各子目录大小，记录到 tasks/du_{ts}.txt",
-    "生成系统信息报告（CPU/内存/磁盘），保存到 tasks/sysinfo_{ts}.txt",
-    "写个 Python 计算器脚本保存到 tasks/calc_{ts}.py 并运行验证",
-    "生成 10 条随机名言 JSON，保存到 tasks/quotes_{ts}.json",
-    "把 /home/user/.dsh_pend/www 打包成 tar.gz 存到 tasks，报告大小 {ts}",
+    "在沙箱 /home/user/.dsh_pend/tasks/ 生成 99 乘法表，保存为 multiply_{ts}.txt",
+    "用几行 HTML+CSS 写一个简洁的 404 页面，保存到 tasks/404_{ts}.html",
+    "在沙箱生成系统信息小报告（uname、内存、磁盘），保存到 tasks/sysinfo_{ts}.txt",
+    "写个 Python 计算器脚本（加减乘除）保存到 tasks/calc_{ts}.py 并运行验证",
+    "生成 10 条随机励志名言，保存 JSON 到 tasks/quotes_{ts}.json",
+    "在 tasks/ 下创建商品报价表 CSV（至少 8 行），文件名带时间戳 {ts}",
+    "写一篇 100 字小作文，主题随机，保存到 tasks/essay_{ts}.md",
+    "把 /home/user/.dsh_pend 目录树列出来保存到 tasks/tree_{ts}.txt",
 ]
-WAKE_CMD = "沙箱隧道断了，请执行 sh /home/user/.dsh_pend/bin/ensure.sh 重新拉起所有服务，执行完把最后 10 行输出发我"
-
-def auto_pick_conv(uid, dead_id):
-    """死亡自动接管：从会话列表挑一个存活且非死亡会话的，按命名配置重命名并设为保活
-    （不依赖豆包新建接口，实测可用；用户可在豆包手动新建会话，这里自动接管）
-    """
-    name = DB.next_conv_name(uid)
-    for s in API.sessions():
-        if s["id"] != dead_id and DB.get_conv(uid, s["id"])["alive"] == 1:
-            API.rename(s["id"], name)
-            return {"conversation_id": s["id"], "name": name}
-    # 没有可接管的存活会话：返回空，不假装成功
-    return {"conversation_id": "", "name": name}
 
 def active_uid():
     try: return json.load(open(ACTIVE_F)).get("uid","")
     except Exception: return ""
-
-def tunnel_ok(port):
-    import urllib.request
-    try:
-        r=urllib.request.urlopen("http://127.0.0.1:%d/ping"%port,timeout=3)
-        return b"ok" in r.read(200)
-    except Exception: return False
 
 def main():
     uid = active_uid()
     if not uid:
         log.error("无 active 账号，退出"); return
     acc = DB.get_account(uid)
-    if not acc:
-        log.error("账号不存在: %s", uid); return
-    s = DB.all_settings(uid)
-    keep_id = acc["keep_conv_id"]
-    log.info("启动 uid=%s 保活会话=%s 自动新开=%s", uid, keep_id, s["auto_new_on_dead"])
-
-    # 死亡会话直接不保活
-    if keep_id:
-        cv = DB.get_conv(uid, keep_id)
-        if cv["alive"] == 0:
-            log.warning("当前保活会话 %s 已标记死亡（%s），不发送保活指令", keep_id, cv["dead_reason"])
-            if s["auto_new_on_dead"] == "1":
-                log.info("自动新开已开启 → 新建会话")
-                new = auto_pick_conv(uid, keep_id)
-                if new["conversation_id"]:
-                    DB.upsert_conv(uid, new["conversation_id"], new["name"], alive=1)
-                    DB.set_keep_conv(uid, new["conversation_id"], new["name"])
-                    keep_id = new["conversation_id"]
-                    log.info("新会话 %s %s 已设为保活", keep_id, new["name"])
-            else:
-                log.info("自动新开未开启，等待用户手动处理")
-                return
-        else:
-            log.info("会话状态: 存活")
-
-    interval_task = int(s["keep_interval_sec"] or 1800)
-    interval_wake = int(s["wake_interval_sec"] or 1200)
-    keywords = s["death_keywords"]
-    last_task = 0; last_wake = 0; n = 0
+    if not acc or not acc["keep_conv_id"]:
+        log.error("账号或保活会话未配置，退出"); return
+    log.info("启动 纯保活 uid=%s 会话=%s（只发小任务，不管隧道）", uid, acc["keep_conv_id"])
+    last_task = 0; n = 0
 
     while True:
         n += 1
-        time.sleep(60)
-        # 每轮重读配置（用户在网页改了立即生效）
+        time.sleep(30)  # 每 30 秒检查一次是否到间隔
         s = DB.all_settings(uid)
         acc = DB.get_account(uid)
-        keep_id = acc["keep_conv_id"] if acc else ""
-        if not keep_id:
+        cid = acc["keep_conv_id"] if acc else ""
+        if not cid:
             log.warning("未配置保活会话，等待"); continue
-        cv = DB.get_conv(uid, keep_id)
-        if cv["alive"] == 0:
-            log.info("会话已死亡，跳过本轮（自动新开=%s）", s["auto_new_on_dead"])
+        # 每轮强制重读会话状态（防止上一轮 upsert 覆盖标死状态）
+        c = DB.conn(); row = c.execute("SELECT alive,dead_reason FROM conv_status WHERE uid=? AND conv_id=?",(uid,cid)).fetchone(); c.close()
+        cv_alive = row["alive"] if row else 1
+        cv_reason = row["dead_reason"] if row else ""
+        if cv_alive == 0:
             if s["auto_new_on_dead"] == "1":
-                new = auto_pick_conv(uid, keep_id)
+                name = DB.next_conv_name(uid)
+                new = API.create_conv_by_send(name)
                 if new["conversation_id"]:
-                    DB.upsert_conv(uid,new["conversation_id"],new["name"],alive=1)
-                    DB.set_keep_conv(uid,new["conversation_id"],new["name"])
-                    keep_id=new["conversation_id"]
-                    log.info("自动新开 %s", keep_id)
-                else: continue
-            else: continue
+                    DB.upsert_conv(uid, new["conversation_id"], name, alive=1)
+                    DB.set_keep_conv(uid, new["conversation_id"], name)
+                    log.info("☠️ 会话死亡 → 自动新建 %s (%s) 并设为保活", new["conversation_id"], name)
+                    cid = new["conversation_id"]
+                else:
+                    log.error("自动新建失败: %s", new.get("hint","")); continue
+            else:
+                log.info("会话已死亡（%s）且自动新开关闭，本轮跳过", cv_reason); continue
 
         now = time.time()
-        ctl = tunnel_ok(17800); pan = tunnel_ok(18090)
-        if ctl and pan:
-            if now - last_task >= int(s["keep_interval_sec"] or 1800):
-                text = TASKS[n % len(TASKS)].replace("{ts}", str(int(now)))
-                kind = "保活任务"
-            else: continue
-        else:
-            if now - last_wake >= int(s["wake_interval_sec"] or 1200):
-                text = WAKE_CMD; kind = "恢复指令"
-            else: continue
-
-        log.info("[%d] %s → 会话 %s", n, kind, keep_id)
-        sse = API.send_full(keep_id, text)
+        interval = int(s["keep_interval_sec"] or 1800)
+        if now - last_task < interval:
+            continue
+        text = TASKS[n % len(TASKS)].replace("{ts}", str(int(now)))
+        log.info("[%d] 保活小任务 → %s", n, cid)
+        sse = API.send_full(cid, text)
         if not sse:
             log.error("发送无响应"); continue
-        # 更新 last
-        if kind == "保活任务": last_task = now
-        else: last_wake = now
-        # 读取回复
+        last_task = now
         reply = API.extract_reply(sse)
-        log.info("豆包回复: %s", reply[:120])
-        # 死亡检测
-        hit = API.death_check(sse, keywords)
-        DB.upsert_conv(uid, keep_id, alive=1)
+        log.info("豆包回复: %s", reply[:100])
+        hit = API.death_check(sse, s["death_keywords"])
         if hit:
-            DB.mark_dead(uid, keep_id, "回复命中: " + hit)
-            log.warning("☠️ 会话 %s 标记死亡（命中「%s」），本会话不再保活", keep_id, hit)
-            if s["auto_new_on_dead"] == "1":
-                new = auto_pick_conv(uid, keep_id)
-                if new["conversation_id"]:
-                    DB.upsert_conv(uid,new["conversation_id"],new["name"],alive=1)
-                    DB.set_keep_conv(uid,new["conversation_id"],new["name"])
-                    log.info("自动新开新会话 %s (%s)", new["conversation_id"], new["name"])
+            DB.mark_dead(uid, cid, "保活任务命中: " + hit)
+            log.warning("☠️ 会话 %s 标记死亡（%s）", cid, hit)
         else:
-            log.info("✅ 会话 %s 状态正常（存活）", keep_id)
+            DB.upsert_conv(uid, cid, alive=1)
+            log.info("✅ 保活任务完成，会话存活")
 
 if __name__ == "__main__":
     main()

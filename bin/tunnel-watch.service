@@ -1,0 +1,14 @@
+[Unit]
+Description=DoubaoBox Tunnel Watchdog (1s probe, 3 fails -> wake)
+After=network-online.target doubao-cdp.service
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/tunnel_watch.py
+Restart=always
+RestartSec=3
+StandardOutput=null
+StandardError=append:/root/tunnel_watch.log
+[Install]
+WantedBy=multi-user.target

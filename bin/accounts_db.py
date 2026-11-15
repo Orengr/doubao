@@ -100,7 +100,7 @@ DEFAULT_SETTINGS = {
     "keep_interval_sec": "1800",    # 保活任务间隔
     "wake_interval_sec": "1200",    # 恢复指令间隔
     "cloud_mode": "9",              # 云电脑模式
-    "death_keywords": "不能执行|无法执行|拒绝执行|高风险|高危操作|标记为高风险|不执行|违规|安全限制|无法提供|不支持",
+    "death_keywords": "不能执行|无法执行|拒绝执行|高风险|高危操作|标记为高风险|不执行|违规|安全限制",
 }
 def get_setting(uid,key,default=None):
     c=conn(); r=c.execute("SELECT value FROM settings WHERE uid=? AND key=?",(uid,key)).fetchone(); c.close()
