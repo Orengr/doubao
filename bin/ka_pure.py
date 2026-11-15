@@ -10,8 +10,8 @@ import conv_api as API
 
 ACTIVE_F = "/root/active_account.json"
 LOG_F = "/root/ka_pure.log"
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
-    handlers=[logging.FileHandler(LOG_F, encoding="utf-8"), logging.StreamHandler()])
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", handlers=[logging.FileHandler(LOG_F, encoding="utf-8")])
+
 log = logging.getLogger("ka6")
 
 # 沙箱内的小任务：保持实例活跃，无恢复、无高风险操作
@@ -74,7 +74,7 @@ def main():
         log.info("[%d] 保活小任务 → %s", n, cid)
         sse = API.send_full(cid, text)
         if not sse:
-            log.error("发送无响应"); continue
+            log.error("发送无有效回复（未落库）"); continue
         last_task = now
         next_gap = random.randint(180, 300)  # 本次完成后重新抽 3~5 分钟
         log.info("下一次小任务将在 %d 秒后", next_gap)

@@ -168,3 +168,19 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 **豆包沙箱侧没起来**：frp 隧道断、17800/18090 无监听、1Panel 网站 502，导致"用豆包当免费服务器"这最后一环没闭环。
 导航页已如实标红 1Panel 不通，不假装在跑。
 剩余唯一主线：让豆包在沙箱里执行 ensure.sh/restore_all.sh 把 frpc+1Panel+控制面拉起来，隧道回连后 /panel/ 自动可用。
+
+
+## 纠错（2026-11-15 23:20，亲自复跑后更正）
+之前几轮误判，特此更正，**以会话记录 + frps dashboard 为唯一标准**：
+1. **不是账号风控**：23:10 一次 `710022004` 是瞬时拒绝。23:15:51 用户「你好呀」发出并回复；23:16 亲手实验 `SSE_ACK` 无 STREAM_ERROR，抽出真回复；23:14:38 / 23:15:36 / 23:16:40 保活与恢复指令全落库。
+2. **不是 frps 双进程**：现只有 pid 3953408，systemd MainPID 就是它；11-14 的 `bind: address already in use` 是历史日志。dashboard 端口是 **7501** 不是 7500。
+3. **沙箱/1Panel 实际已恢复**：frps dashboard 两条 proxy moin-control(17800)/moin-panel(18090) 均 online，lastStartTime 23:15:08；`17800/ping` → `{"ok":true,host:vefaas-l148mv98…}`；经 80 端口 `/` `/panel/` `/lite/` 全 200。
+4. **真实根因只有一个**：`send_full` 把"有 SSE 回包"当落库、空回复也记 ✅，导致 22:35~23:14 之间日志显示成功但会话记录没消息；后来又把一次瞬时风控错误固化成全局失败判定，把真成功也屏蔽了。已修：只在 `STREAM_ERROR 且无 SSE_ACK` 时判失败；空回复不记成功但如实报「无有效回复（未落库）」。
+5. **总项目重新核对：已完成**。服务器侧 + 豆包沙箱侧 + frp 隧道 + 1Panel 入口全部实测可用。
+
+### 当前真实状态
+- 服务：moin-unified / ka-pure / tunnel-watch / frps / nginx / xvfb / doubao-cdp 全 active
+- 入口(仅80)：/ 导航页200、/lite/ 控制台200、/chat 对话页200、/api/ 200、/dl/ 200、/panel/ 200
+- 沙箱：17800/ping ok，frp 两隧道 online，保活小任务 3-5min 随机，哨兵 1s/3fail
+- 会话：老王（P）存活，保活运行中，豆包持续执行 ensure.sh / 小任务
+- 1Panel 直连 18090 根路径显示「暂时无法访问」是 1Panel 自身安全入口（需带随机路径），非故障

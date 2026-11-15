@@ -11,8 +11,8 @@ import conv_api as API
 ACTIVE_F = "/root/active_account.json"
 LOG_F = "/root/tunnel_watch.log"
 WAKE_CMD = "沙箱隧道断了，请执行 sh /home/user/.dsh_pend/bin/ensure.sh 重新拉起所有服务，执行完把最后 10 行输出发我"
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
-    handlers=[logging.FileHandler(LOG_F, encoding="utf-8"), logging.StreamHandler()])
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", handlers=[logging.FileHandler(LOG_F, encoding="utf-8")])
+
 log = logging.getLogger("watch")
 
 def probe(port):
@@ -68,15 +68,16 @@ def main():
             sse = API.send_full(cid, WAKE_CMD)
             last_fire = time.time()
             fail_count = 0
-            if sse:
+            reply = API.extract_reply(sse) if sse else ""
+            if not reply:
+                log.error("⚠️ 拉起指令已发但豆包无有效回复（沙箱未执行/实例漂移），不算恢复成功")
+            else:
                 hit = API.death_check(sse, DB.all_settings(uid)["death_keywords"])
                 if hit:
                     DB.mark_dead(uid, cid, "拉起指令命中: " + hit)
                     log.warning("☠️ 拉起指令命中拒绝词，会话标记死亡")
                 else:
-                    log.info("✅ 拉起指令已发，回复: %s", API.extract_reply(sse)[:80])
-            else:
-                log.error("拉起指令无响应")
+                    log.info("✅ 拉起指令已发，回复: %s", reply[:80])
 
 if __name__ == "__main__":
     main()

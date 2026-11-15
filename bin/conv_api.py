@@ -105,7 +105,12 @@ def send_full(conv_id, text):
   return await r.text();
 })()
 """.replace("%CID%", json.dumps(conv_id)).replace("%TEXT%", json.dumps(text, ensure_ascii=False))
-    return page_eval(js, 100) or ""
+    out = page_eval(js, 100) or ""
+    # 只在明确收到 STREAM_ERROR 且没有 SSE_ACK 时才视为失败；
+    # SSE_ACK + 后续内容 = 真落库（瞬时 710022004 不代表本次失败）
+    if "STREAM_ERROR" in out and "SSE_ACK" not in out:
+        return ""
+    return out
 
 # ---- 重命名（已抓包验证）----
 def rename(conv_id, name):
