@@ -130,3 +130,14 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 ### 修
 - /api/keep/stop 原只停 ka-pure → 改 KEEP.stop_all()；新增 /api/keep/start。
 - /api/conv/new 误用 create_conv_by_ui → 切回已打通的 create_conv_by_send。
+
+
+## v8 更新（2026-11-15 22:55）
+### 用户 4 项
+1. **小任务保活 3–5 分钟随机**：ka_pure 不再读 keep_interval_sec，启动/每次发送后用 random.randint(180,300) 抽下次间隔，并打日志「下一次小任务将在 N 秒后」。实测新进程 22:51:04 启动日志生效。
+2. **模式改回无 emoji 分段按钮**：「云电脑 / 对话」两个按钮，当前项高亮，.seg 分段控件，无 emoji、无下拉。
+3. **已登录隐藏登录卡 + 顶栏账号 + 退出登录**：顶栏显示「● 当前已登录：小777」+「退出登录」按钮；/api/logout 停 ka-pure/tunnel-watch、清 active_account.json、清浏览器 cookie（保留账号库/历史/配置）。防假登录：status() 用 sessions 验活，读不出会话列表就 logged_in=false。未登录时顶栏「登录」按钮可展开登录卡。
+4. **会话列表限高可滑动**：#convs max-height:210px + overflow-y:auto + 滚动条样式，约 3 个会话高度，其余滑动查看。
+
+### 运维注意
+- ka_pure 曾因 pkill -9 后 systemd 进入 failed 未自动拉起，用 systemctl reset-failed ka-pure && systemctl start ka-pure 恢复。常规「启用/停止保活」走 keepctl 不受影响。

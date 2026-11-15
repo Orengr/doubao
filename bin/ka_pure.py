@@ -3,7 +3,7 @@
 """ka_pure.py v6 — 纯保活引擎（只做沙箱小任务，不检测隧道、不发恢复指令）
 隧道检测与拉起由独立 tunnel_watch.py 负责。
 """
-import sys, time, json, logging
+import sys, time, json, logging, random
 sys.path.insert(0, "/root")
 import accounts_db as DB
 import conv_api as API
@@ -37,8 +37,9 @@ def main():
     acc = DB.get_account(uid)
     if not acc or not acc["keep_conv_id"]:
         log.error("账号或保活会话未配置，退出"); return
-    log.info("启动 纯保活 uid=%s 会话=%s（只发小任务，不管隧道）", uid, acc["keep_conv_id"])
+    log.info("启动 纯保活 uid=%s 会话=%s（小任务每3-5分钟随机一次，不管隧道）", uid, acc["keep_conv_id"])
     last_task = 0; n = 0
+    next_gap = random.randint(180, 300)  # 3~5 分钟内随机
 
     while True:
         n += 1
@@ -67,8 +68,7 @@ def main():
                 log.info("会话已死亡（%s）且自动新开关闭，本轮跳过", cv_reason); continue
 
         now = time.time()
-        interval = int(s["keep_interval_sec"] or 1800)
-        if now - last_task < interval:
+        if now - last_task < next_gap:
             continue
         text = TASKS[n % len(TASKS)].replace("{ts}", str(int(now)))
         log.info("[%d] 保活小任务 → %s", n, cid)
@@ -76,6 +76,8 @@ def main():
         if not sse:
             log.error("发送无响应"); continue
         last_task = now
+        next_gap = random.randint(180, 300)  # 本次完成后重新抽 3~5 分钟
+        log.info("下一次小任务将在 %d 秒后", next_gap)
         reply = API.extract_reply(sse)
         log.info("豆包回复: %s", reply[:100])
         hit = API.death_check(sse, s["death_keywords"])
