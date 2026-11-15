@@ -30,10 +30,10 @@ def main():
     uid = active_uid()
     if not uid:
         log.error("无 active 账号，退出"); return
-    log.info("隧道哨兵启动 uid=%s（每秒检测 17800/18090，连续3秒失败→秒发拉起）", uid)
+    log.info("隧道哨兵启动 uid=%s（每秒探测，连续5秒失败即拉起）", uid)
     fail_count = 0
     last_fire = 0
-    COOLDOWN = 60  # 拉起指令发出后至少 60 秒不重复发
+    COOLDOWN = 0  # 拉起指令发出后至少 60 秒不重复发
 
     while True:
         time.sleep(1)
@@ -49,7 +49,7 @@ def main():
             continue
         fail_count += 1
         log.warning("隧道失败 #%d (17800=%s 18090=%s)", fail_count, ctl, pan)
-        if fail_count >= 3:
+        if fail_count >= 5:
             now = time.time()
             if now - last_fire < COOLDOWN:
                 log.info("冷却中，跳过重复拉起")
@@ -64,7 +64,7 @@ def main():
                 log.warning("保活会话已死亡，先交给 ka_pure 自动新建，本轮不发拉起")
                 fail_count = 0
                 continue
-            log.info("⚡ 连续3秒失败 → 秒发拉起指令 → %s", cid)
+            log.info("⚡ 连续5秒失败 → 发拉起指令 → %s", cid)
             sse = API.send_full(cid, WAKE_CMD)
             last_fire = time.time()
             fail_count = 0

@@ -49,7 +49,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 
 <div class="sec">沙箱服务</div>
 <div class="grid">
-  <a class="tile" href="/panel/go?v=2" id="panelTile">
+  <a class="tile primary" href="/panel" id="myPanel">
+    <div class="ico">◉</div><div class="t">服务器面板</div>
+    <div class="d">概览 / 健康 / 文件 / 站点 / 进程 / 终端</div>
+    <span class="badge ok" id="b-mypanel">检测</span>
+  </a>
+  <a class="tile" href="/cSK41ajJX5" id="panelTile">
     <div class="ico">▦</div><div class="t">1Panel 面板</div>
     <div class="d">建站 / 数据库 / 文件</div>
     <span class="badge warn" id="b-panel">检测</span>
@@ -63,7 +68,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 
 <div class="sec">1Panel 登录信息</div>
 <div class="info">
-  <div class="row"><span class="k">入口</span><span class="v" style="font-size:11px">/panel/go（自动）</span></div>
+  <div class="row"><span class="k">入口</span><span class="v" style="font-size:11px">/cSK41ajJX5（经80）</span></div>
   <div class="row"><span class="k">用户名</span><span class="v">1panel_admin</span></div>
   <div class="row"><span class="k">密码</span><span class="v">Jwgk8CoJfnts</span></div>
   <div class="row"><span class="k">直连(同80转发)</span><span class="v" style="font-size:11px" id="rawPanel">读取中</span></div>
@@ -102,8 +107,10 @@ async function refresh(){
   const items=[
     ['/lite/','b-lite','Moin 控制台'],
     ['/status','b-api','状态接口'],
-    ['/panel/go','b-panel','1Panel 面板'],
-    ['/dl/','b-dl','文件下载']
+    ['/panel','b-mypanel','服务器面板'],
+    ['/cSK41ajJX5','b-panel','1Panel 面板'],
+    ['/dl/','b-dl','文件下载'],
+    ['/bt/','b-bt','宝塔面板']
   ];
   let okCount=0;const rows=[];
   for(const [url,bid,name] of items){

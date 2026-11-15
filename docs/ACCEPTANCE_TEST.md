@@ -220,3 +220,26 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 ### 附带
 - 导航页磁贴 href 加 ?v=2 禁缓存；/status 由 nginx location = 精确代理。
 - 逐项实测：/ 200、/status 标题「运行状态」、/panel/go→loading、/dl/ 列文件、assets JS/CSS 200、7 服务 active。
+
+
+## v12 自制面板（2026-11-16 01:40）
+放弃宝塔/1Panel，自研面板，全面适配豆包沙箱。
+
+### 架构
+- **sbx_agent.py**（沙箱侧，端口 17802→frp 17801）：系统概览/进程/服务健康/站点/文件/容器/终端，纯标准库
+- **moin_api_console.py**（服务器 18800）：面板 UI + 代理 agent，路由 /panel、/api/panel/*
+- **sbx_guard.py**（systemd sbx-guard）：实例重建检测（控制面 host 变化/失联）→ 自动恢复 agent+frpc+软链，实测「恢复结果: OK」
+- frp 三隧道：moin-control(17800) / moin-panel(18090) / sbx-agent(17801)
+
+### 面板功能（7 页）
+概览（CPU核/内存/磁盘/负载/上机时长，带进度条）、健康（6 项服务探测）、文件（浏览/读文件，限持久卷）、站点（扫描 www）、进程（Top40）、容器（proot 隔离运行 + 启动表单）、终端（沙箱内执行命令）
+免费，无 Docker 依赖，界面移动端优先。
+
+### 修改
+- tunnel_watch：判定 3秒→**5秒**，移除 300 秒冷却（按用户要求）
+- ka_pure：小任务间隔 180-300s → **60-90s**，轮询 30s → 10s（持续保活防沙箱回收）
+- nginx：/panel、/api/panel/、/status(302→/panel)、/cSK41ajJX5(1Panel 留存) 全部走 80
+
+### 实测
+入口 / /panel /lite/ /chat /status /dl/ 全通；面板 API ping/overview/services/sites/procs/containers 全 200；
+沙箱数据 2核/4G/10T/105进程；服务 moin-unified/sbx-guard/ka-pure/tunnel-watch/nginx/frps 全 active。

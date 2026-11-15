@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """moin_api_console.py v3 — 18800 纯接口管理台"""
-import json, os, time, subprocess, urllib.request, urllib.parse, logging, sys
+import json, os, time, subprocess, urllib.request, urllib.parse, logging, sys, base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, "/root")
 import accounts_db as DB
@@ -34,15 +34,237 @@ def sessions_with_status():
     out.sort(key=lambda x:(not x["keep"], x["name"]))
     return out
 
+PANEL_TOKEN = "oms2rROVaDd8t8s9jWIYKBW1eYREoQbu"
+PANEL_FALLBACK = "/cSK41ajJX5"
+
+def panel_entrance():
+    # 从沙箱持久卷读入口（控制面 /get 带 token）；失败回退缓存值
+    try:
+        url = "http://127.0.0.1:17800/get?token=" + PANEL_TOKEN + "&p=/home/user/.dsh_pend/state/panel_entrance.txt"
+        r = urllib.request.urlopen(url, timeout=8)
+        e = r.read().decode("utf-8","ignore").strip()
+        if e.startswith("/") and len(e) < 40: return e
+    except Exception: pass
+    return PANEL_FALLBACK
+
+PANEL_TOKEN = "oms2rROVaDd8t8s9jWIYKBW1eYREoQbu"
+CTL_BASE = "http://127.0.0.1:17800"
+PANEL_FALLBACK = "/cSK41ajJX5"
+
+def sbx_sh(cmd, timeout=120):
+    try:
+        url = CTL_BASE + "/sh?token=" + PANEL_TOKEN + "&t=" + str(timeout)
+        req = urllib.request.Request(url, data=cmd.encode(), method="POST")
+        with urllib.request.urlopen(req, timeout=timeout + 15) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        return {"rc": -1, "out": "ERR: " + str(e)[:200]}
+
+def sbx_bg(name, cmd):
+    b64 = base64.b64encode(cmd.encode()).decode()
+    sc = ("mkdir -p /home/user/.dsh_pend/log && echo " + b64 + " | base64 -d > /home/user/.dsh_pend/" + name + ".sh && chmod +x /home/user/.dsh_pend/" + name + ".sh && cd /home/user/.dsh_pend && setsid nohup bash " + name + ".sh >/dev/null 2>&1 </dev/null & echo STARTED")
+    return sbx_sh(sc, 30)
+
+def panel_entrance():
+    try:
+        url = CTL_BASE + "/get?token=" + PANEL_TOKEN + "&p=/home/user/.dsh_pend/state/panel_entrance.txt"
+        e = urllib.request.urlopen(url, timeout=8).read().decode("utf-8", "ignore").strip()
+        if e.startswith("/") and len(e) < 40: return e
+    except Exception: pass
+    return PANEL_FALLBACK
+
+
+AGENT = "http://127.0.0.1:17801"
+
+def agent_get(path):
+    try:
+        u = AGENT + path + ("&" if "?" in path else "?") + "token=" + PANEL_TOKEN
+        with urllib.request.urlopen(u, timeout=20) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        return {"error": "agent: " + str(e)[:150]}
+
+def agent_post(path, body):
+    try:
+        u = AGENT + path + "?token=" + PANEL_TOKEN
+        req = urllib.request.Request(u, data=json.dumps(body).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        return {"error": "agent: " + str(e)[:150]}
+
 def status():
     st=KEEP.status(); ss=sessions_with_status(); st["sessions"]=ss
+    # 防假登录：会话列表读不出来（ERR/空）就视为未登录
+    if ss and ss[0]["id"]=="ERR":
+        st["account"]=None; st["logged_in"]=False
+    else:
+        st["logged_in"]=bool(st.get("account"))
     # 保活会话名以会话列表实时名字为准（避免账号库缓存旧名）
     if st.get("account") and st["account"].get("keep_conv_id"):
         k=st["account"]["keep_conv_id"]
         hit=next((x for x in ss if x["id"]==k), None)
         if hit: st["account"]["keep_conv_name"]=hit["name"]
     if uid(): st["settings"]=DB.all_settings(uid())
+    st["panel_entrance"] = panel_entrance()
     return st
+
+PANEL_HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Moin 面板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0b0f19;--card:#121826;--card2:#1a2233;--line:#243044;--txt:#e8eefc;--dim:#7f8da8;--ok:#3ddc97;--warn:#ffb648;--err:#ff5c7c;--acc:#4d8dff;--acc2:#7c5cff}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;padding-bottom:env(safe-area-inset-bottom)}
+.top{position:sticky;top:0;z-index:20;background:rgba(11,15,25,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+.top h1{font-size:15px;font-weight:700;flex:1}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(61,220,151,.18)}
+.dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(255,92,124,.18)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(255,182,72,.18)}
+.tabs{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:53px;z-index:19;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:7px 14px;border-radius:9px;font-size:13px;color:var(--dim);cursor:pointer;white-space:nowrap;border:1px solid transparent}
+.tab.on{background:var(--card2);color:var(--txt);border-color:var(--line)}
+.wrap{padding:14px;max-width:860px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px}
+.kpi{text-align:center}
+.kpi .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .k{font-size:11.5px;color:var(--dim);margin-top:2px}
+.bar{height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:.4s}
+.bar.warn i{background:linear-gradient(90deg,var(--warn),#ff8a3d)}
+.bar.err i{background:linear-gradient(90deg,var(--err),#ff3d6e)}
+h2{font-size:13px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase;margin:16px 0 9px;font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;gap:10px}
+.row:last-child{border:0}
+.row .k{color:var(--dim);font-size:12.5px;flex:none}
+.row .v{font-weight:600;text-align:right;word-break:break-all;font-size:12.5px}
+.ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}.dim{color:var(--dim)}
+.pill{font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.pill.ok{background:rgba(61,220,151,.15)}
+.pill.err{background:rgba(255,92,124,.15)}
+button{background:var(--acc);border:0;color:#fff;padding:8px 14px;border-radius:9px;font-size:13px;cursor:pointer}
+button.sec{background:var(--card2);border:1px solid var(--line);color:var(--txt)}
+button.sm{padding:5px 10px;font-size:12px}
+button:active{transform:scale(.97)}
+input,textarea,select{background:#0d1117;border:1px solid var(--line);color:var(--txt);padding:9px 11px;border-radius:9px;font-size:13px;width:100%;font-family:inherit}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:52vh;font-size:11.5px;color:#9fb0c9;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,SFMono-Regular,monospace}
+.fitem{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.fitem:last-child{border:0}
+.fitem .ico{width:26px;height:26px;border-radius:7px;background:var(--card2);display:grid;place-items:center;font-size:12px;flex:none}
+.fitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fitem .sz{font-size:11px;color:var(--dim);flex:none}
+.toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:140px}
+.hide{display:none}
+</style></head><body>
+<div class="top"><div class="logo">M</div><h1>Moin 面板</h1><span class="dot" id="dot"></span><span id="hostTxt" class="dim" style="font-size:11.5px"></span></div>
+<div class="tabs" id="tabs"></div>
+<div class="wrap" id="view"></div>
+<script>
+const TABS=[["overview","概览"],["health","健康"],["files","文件"],["sites","站点"],["procs","进程"],["containers","容器"],["terminal","终端"]];
+let cur="overview", S={};
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function fmtU(s){if(!s)return"—";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d>0?d+"天"+h+"时":h>0?h+"时"+m+"分":m+"分"+(s%60)+"秒"}
+function fmtSz(b){if(!b)return"0";const u=["B","K","M","G","T"];let i=0;while(b>=1024&&i<4){b/=1024;i++}return b.toFixed(i?1:0)+u[i]}
+function barCls(p){p=parseFloat(p)||0;return p>85?"err":p>70?"warn":""}
+async function api(p,opt){const r=await fetch(p,opt);if(!r.ok)throw new Error(r.status);const t=await r.text();try{return JSON.parse(t)}catch(e){return t}}
+function renderTabs(){document.getElementById('tabs').innerHTML=TABS.map(([k,n])=>'<div class="tab '+(k===cur?'on':'')+'" onclick="go(\''+k+'\')">'+n+'</div>').join('')}
+function go(k){cur=k;renderTabs();load()}
+async function load(){
+  const v=document.getElementById('view');
+  try{
+    if(cur==='overview'){const o=await api('/api/panel/overview');S.o=o;v.innerHTML=ovHTML(o)}
+    else if(cur==='health'){const h=await api('/api/panel/services');v.innerHTML=healthHTML(h)}
+    else if(cur==='files'){await files('')}
+    else if(cur==='sites'){const s=await api('/api/panel/sites');v.innerHTML=sitesHTML(s)}
+    else if(cur==='procs'){const p=await api('/api/panel/procs');v.innerHTML=procsHTML(p)}
+    else if(cur==='containers'){const c=await api('/api/panel/containers');v.innerHTML=contHTML(c)}
+    else if(cur==='terminal'){v.innerHTML=termHTML()}
+  }catch(e){v.innerHTML='<div class="card err">加载失败: '+esc(e.message)+'</div>'}
+}
+function ovHTML(o){
+  const mp=o.mem_total_mb?Math.round(o.mem_used_mb/o.mem_total_mb*100):0;
+  const dp=parseFloat(o.disk_pct)||0;
+  return '<h2>系统</h2><div class="grid">'+
+   '<div class="card kpi"><div class="v">'+esc(o.cpu_cores)+'</div><div class="k">CPU 核心</div></div>'+
+   '<div class="card kpi"><div class="v">'+esc(o.procs)+'</div><div class="k">进程数</div></div>'+
+   '<div class="card kpi"><div class="v">'+fmtU(o.uptime_sec)+'</div><div class="k">运行时长</div></div>'+
+   '<div class="card kpi"><div class="v">'+esc(o.agent_uptime?fmtU(o.agent_uptime):"—")+'</div><div class="k">Agent 存活</div></div>'+
+   '</div>'+
+   '<h2>内存</h2><div class="card"><div class="row"><span class="k">已用 / 总</span><span class="v">'+o.mem_used_mb+' MB / '+o.mem_total_mb+' MB</span></div>'+
+   '<div class="bar '+barCls(mp)+'"><i style="width:'+mp+'%"></i></div>'+
+   '<div class="row dim" style="border:0;padding-top:6px"><span class="k">占用率</span><span class="v">'+mp+'%</span></div></div>'+
+   '<h2>磁盘 (持久卷)</h2><div class="card"><div class="row"><span class="k">已用 / 总</span><span class="v">'+esc(o.disk_used)+' / '+esc(o.disk_total)+'</span></div>'+
+   '<div class="bar '+barCls(dp)+'"><i style="width:'+dp+'%"></i></div>'+
+   '<div class="row dim" style="border:0;padding-top:6px"><span class="k">可用</span><span class="v">'+esc(o.disk_avail)+' ('+esc(o.disk_pct)+')</span></div></div>'+
+   '<h2>主机信息</h2><div class="card">'+
+   '<div class="row"><span class="k">主机名</span><span class="v">'+esc(o.host)+'</span></div>'+
+   '<div class="row"><span class="k">系统</span><span class="v">'+esc(o.os)+'</span></div>'+
+   '<div class="row"><span class="k">内核</span><span class="v">'+esc(o.kernel)+'</span></div>'+
+   '<div class="row"><span class="k">负载</span><span class="v">'+esc(o.load)+'</span></div></div>';
+}
+function healthHTML(h){
+  const bad=h.filter(x=>!x.ok).length;
+  return '<h2>服务健康 '+(bad?'<span class="err">('+bad+' 项异常)</span>':'<span class="ok">(全部正常)</span>')+'</h2><div class="card">'+
+   h.map(x=>'<div class="row"><span class="k">'+esc(x.name)+'</span><span class="pill '+(x.ok?'ok':'err')+'">'+(x.ok?'正常':'异常')+'</span></div>').join('')+
+   '</div><div style="margin-top:12px"><button class="sec" onclick="load()">重新检测</button></div>';
+}
+async function files(p){
+  const d=await api('/api/panel/ls?p='+encodeURIComponent(p||''));
+  S.fp=d.path;
+  const up=p&&d.path?d.path.split('/').slice(0,-1).join('/'):'';
+  document.getElementById('view').innerHTML=
+   '<div class="toolbar"><input id="fp" value="'+esc(d.path)+'"><button class="sm" onclick="files(document.getElementById(\'fp\').value)">打开</button></div>'+
+   '<div class="card">'+(p?'<div class="fitem" onclick="files(\''+esc(up)+'\')"><div class="ico">↑</div><div class="nm">.. 上级</div></div>':'')+
+   d.items.map(i=>'<div class="fitem" onclick="'+(i.dir?'files(\''+esc(d.path.replace(/\/$/,''))+'/'+esc(i.name)+'\')':'openFile(\''+esc(d.path.replace(/\/$/,''))+'/'+esc(i.name)+'\')')+'"><div class="ico">'+(i.dir?'▸':'▤')+'</div><div class="nm">'+esc(i.name)+'</div><div class="sz">'+(i.dir?'':fmtSz(i.size))+'</div></div>').join('')+
+   '</div><pre id="fileview" class="hide"></pre>';
+}
+async function openFile(p){
+  const c=await api('/api/panel/read?p='+encodeURIComponent(p));
+  const el=document.getElementById('fileview');el.classList.remove('hide');el.textContent=c;
+  el.scrollIntoView({behavior:'smooth'});
+}
+function sitesHTML(s){
+  if(!s.length)return '<div class="card dim">暂无站点。站点目录位于持久卷 /home/user/.dsh_pend/www</div>';
+  return '<h2>站点 ('+s.length+')</h2><div class="card">'+s.map(x=>'<div class="row"><span class="k">'+esc(x.name)+'</span><span class="v dim">'+esc(x.path)+' · '+x.files+' 文件</span></div>').join('')+'</div>';
+}
+function procsHTML(p){
+  return '<h2>进程 Top '+p.length+'</h2><div class="card">'+p.map(x=>'<div class="row"><span class="k">'+esc(x.name)+' <span class="dim">#'+x.pid+'</span></span><span class="v dim">CPU '+x.cpu+'% · 内存 '+x.rss_mb+'M</span></div>').join('')+'</div>';
+}
+function contHTML(c){
+  return '<h2>容器化运行 (proot)</h2><div class="card">'+(c.length?c.map(x=>'<div class="row"><span class="k">#'+esc(x.pid)+'</span><span class="v dim">'+esc(x.cmd)+'</span></div>').join(''):'<div class="dim">暂无容器进程</div>')+'</div>'+
+   '<h2>启动容器</h2><div class="card"><div style="margin-bottom:8px"><input id="cn" placeholder="名称(如 web1)"></div>'+
+   '<div style="margin-bottom:8px"><input id="cr" placeholder="rootfs 路径(可选，如 /home/user/.dsh_pend/rootfs/alpine)"></div>'+
+   '<div style="margin-bottom:10px"><input id="cc" placeholder="启动命令，如 /bin/sh -c \"python3 -m http.server 8080\""></div>'+
+   '<button onclick="runC()">启动</button></div><pre id="cout" class="hide"></pre>';
+}
+async function runC(){
+  const b={name:document.getElementById('cn').value||'app',rootfs:document.getElementById('cr').value||'',cmd:document.getElementById('cc').value||'/bin/sh'};
+  const r=await api('/api/panel/run_container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  const el=document.getElementById('cout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2);
+}
+function termHTML(){
+  return '<h2>终端 (沙箱内执行)</h2><div class="card"><textarea id="cmd" rows="3" placeholder="输入命令，如 df -h 或 ls /home/user"></textarea>'+
+   '<div style="margin-top:9px;display:flex;gap:8px"><button onclick="runCmd()">执行</button><button class="sec" onclick="document.getElementById(\'cout2\').textContent=\'\'">清屏</button></div></div><pre id="cout2">就绪</pre>';
+}
+async function runCmd(){
+  const c=document.getElementById('cmd').value;if(!c.trim())return;
+  const el=document.getElementById('cout2');el.textContent='执行中…';
+  try{const r=await api('/api/panel/sh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:c})});
+    el.textContent='$ '+c+'\n'+(r.out||'')+'\n[rc='+r.rc+']';}catch(e){el.textContent='失败: '+e.message}
+}
+async function ping(){
+  try{const p=await api('/api/panel/ping');
+    document.getElementById('dot').className='dot '+(p.ok?'':'err');
+    document.getElementById('hostTxt').textContent=(p.host||'').replace(/^vefaas-/,'').split('-')[0]||'';
+  }catch(e){document.getElementById('dot').className='dot err'}
+}
+renderTabs();load();ping();setInterval(ping,10000);
+</script></body></html>"""
 
 HTML = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Moin 控制台</title>
@@ -74,10 +296,18 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 .modebtn{display:flex;gap:6px}.modebtn button{flex:1}.modebtn button.on{background:#1f6feb}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}
 .sw{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #30363d}
+#convs{max-height:210px;overflow-y:auto;padding-right:4px;-webkit-overflow-scrolling:touch}
+#convs::-webkit-scrollbar{width:5px}#convs::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+.seg{display:inline-flex;border:1px solid #30363d;border-radius:8px;overflow:hidden;background:#0d1117}
+.seg button{border:0;border-radius:0;background:transparent;color:#8b949e;padding:7px 16px;min-width:92px}
+.seg button.on{background:#1f6feb;color:#fff}
+.topuser{display:flex;align-items:center;gap:8px;font-size:13px}
+.topuser button{padding:5px 10px;font-size:12px}
+.hidden{display:none !important}
 </style></head><body>
-<header><h1>Moin 控制台 <span class="badge">纯接口 · 无扫码</span></h1><span id="head" class="dim">初始化…</span></header>
+<header><h1>Moin 控制台 <span class="badge">纯接口 · 无扫码</span></h1><div class="topuser" id="topUser">初始化…</div></header>
 <main>
-<div class="card"><h2>① 登录（手机号 + 短信验证码）</h2>
+<div class="card" id="loginCard"><h2>① 登录（手机号 + 短信验证码）</h2>
 <div class="row"><input id="phone" placeholder="手机号" value="18053220144"><button onclick="loginSend()">获取验证码</button></div>
 <div class="row"><input id="code" placeholder="6 位验证码"><button onclick="loginVerify()">提交登录</button></div>
 <pre id="loginOut">—</pre></div>
@@ -88,8 +318,9 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <button class="sec" onclick="keepTest()">🧪 保活功能测试</button>
 <span id="keepState2" class="dim"></span></div>
 <pre id="testOut" style="display:none;max-height:120px"></pre>
-<div class="row"><div class="modebtn"><button id="m9" onclick="setMode(9)">☁️ 云电脑</button><button id="m0" onclick="setMode(0)">💬 对话</button></div></div>
-<div class="row"><span class="tag" id="cloudMode">模式读取中…</span></div></div>
+<div class="row"><span class="dim" style="min-width:88px">回答模式</span>
+<div class="seg"><button id="m9" onclick="setMode(9)">云电脑</button><button id="m0" onclick="setMode(0)">对话</button></div>
+<span class="tag" id="cloudMode">模式读取中…</span></div></div>
 
 <div class="card"><h2>③ 会话列表 <span class="dim" style="font-size:12px">点开=查看历史+发消息+等回复</span></h2>
 <div class="row"><button class="sec sm" onclick="newConv()">➕ 新建会话（按命名配置自动重命名）</button></div>
@@ -101,8 +332,8 @@ pre{background:#0d1117;padding:10px;border-radius:6px;overflow:auto;max-height:1
 <div class="sw"><span>新会话命名前缀</span><input id="rnPrefix" style="max-width:110px" onchange="saveSet('rename_prefix',this.value)"></div>
 <div class="sw"><span>命名后缀样式</span><select id="rnStyle" style="max-width:100px" onchange="saveSet('rename_style',this.value)"><option value="letter">A/B/C</option><option value="number">1/2/3</option></select></div>
 <div class="sw"><span>当前计数</span><span id="rnCounter" class="dim">—</span></div></div>
-<div><div class="sw"><span>保活任务间隔(秒)</span><input id="keepInt" style="max-width:100px" onchange="saveSet('keep_interval_sec',this.value)"></div>
-<div class="sw"><span>恢复指令间隔(秒)</span><input id="wakeInt" style="max-width:100px" onchange="saveSet('wake_interval_sec',this.value)"></div>
+<div><div class="sw"><span>小任务保活</span><span class="green">每 3–5 分钟随机一次</span></div>
+<div class="dim" style="font-size:11px;padding:4px 0">固定规则：只发 99 乘法表 / 404 网页等沙箱小任务；隧道哨兵每秒检测、连续 3 秒失败立即拉起，与小任务无关。</div>
 <div class="sw"><span>死亡关键词</span><input id="deathKw" style="max-width:200px" onchange="saveSet('death_keywords',this.value)"></div>
 <div class="sw"><span>预览下一个名字</span><span id="rnPreview" class="green">—</span></div></div></div></div>
 
@@ -124,11 +355,16 @@ function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':
 async function refreshAll(){
   const st=await api('/api/status'); S.status=st; S.settings=st.settings||{};
   const svc=st.service==='active';
-  document.getElementById('head').innerHTML=st.account?'<span class="ok">● '+esc(st.account.name||st.account.uid)+'</span>':'<span class="bad">● 未登录</span>';
-  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>');
+  const logged=st.logged_in!==false && !!st.account;
+  document.getElementById('topUser').innerHTML=logged
+    ? '<span class="ok">● 当前已登录：'+esc(st.account.name||st.account.uid)+'</span><button class="sec" onclick="logout()">退出登录</button>'
+    : '<span class="bad">● 未登录</span><button class="sec" onclick="document.getElementById(\'loginCard\').classList.remove(\'hidden\')">登录</button>';
+  document.getElementById('loginCard').classList.toggle('hidden', logged);
+  const sub='<span class="dim" style="font-size:11px">小任务:'+(st.ka_pure==='active'?'开':'关')+' · 哨兵:'+(st.tunnel_watch==='active'?'开':'关')+'</span>';
+  const ks=(svc?'<span class="ok">● 运行中</span>':'<span class="bad">● 已停止</span>')+' '+sub;
   document.getElementById('keepState').innerHTML='保活 '+ks;
   document.getElementById('keepState2').innerHTML='保活 '+ks;
-  document.getElementById('acct').innerHTML=st.account?
+  document.getElementById('acct').innerHTML=logged?
     '<div>UID <b>'+esc(st.account.uid)+'</b> · '+esc(st.account.phone||'')+'</div>'+
     '<div>保活会话: '+(st.account.keep_conv_id?'<span class="green">'+esc(st.account.keep_conv_name||st.account.keep_conv_id)+'</span>':'<span class="bad">未配置</span>')+'</div>':
     '<span class="bad">未登录</span>';
@@ -148,8 +384,6 @@ async function refreshAll(){
     document.getElementById('autoNew').value=set.auto_new_on_dead;
     document.getElementById('rnPrefix').value=set.rename_prefix||'';
     document.getElementById('rnStyle').value=set.rename_style||'letter';
-    document.getElementById('keepInt').value=set.keep_interval_sec||'';
-    document.getElementById('wakeInt').value=set.wake_interval_sec||'';
     document.getElementById('deathKw').value=set.death_keywords||'';
     document.getElementById('rnCounter').innerText=set.rename_counter||'0';
     document.getElementById('rnPreview').innerText=set.next_name||'—';
@@ -157,6 +391,8 @@ async function refreshAll(){
   const h=await api('/api/history');
   document.getElementById('history').innerHTML=h.map(x=>'<div class="hist" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed #30363d"><span>'+esc(x.name||x.uid)+' · '+esc(x.phone||'')+'</span><span class="dim">'+new Date(x.at*1000).toLocaleString()+'</span></div>').join('')||'无';
 }
+async function logout(){if(!confirm('退出当前登录？退出后可重新用手机号接验证码登录。'))return;await api('/api/logout');refreshAll()}
+async function toggleAlive(cid,to){await api('/api/conv/'+(to?'alive':'dead')+'?cid='+encodeURIComponent(cid));refreshAll()}
 async function saveSet(k,v){await api('/api/setting/set?key='+encodeURIComponent(k)+'&value='+encodeURIComponent(v));refreshAll()}
 async function loginSend(){const r=await fetch('/api/login/send?phone='+encodeURIComponent(document.getElementById('phone').value));document.getElementById('loginOut').innerText=await r.text()}
 async function loginVerify(){
@@ -199,6 +435,74 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/":
                 b=HTML.encode();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8")
                 self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
+            elif p.path=="/api/logout":
+                # 退出登录：停保活/哨兵，清空 active 与浏览器 cookie；保留账号库/历史/配置
+                KEEP.stop_all()
+                try: os.remove(ACTIVE_F)
+                except Exception: pass
+                try:
+                    import websocket as _ws
+                    v = json.loads(urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=5).read())
+                    w = _ws.create_connection(v["webSocketDebuggerUrl"], timeout=10)
+                    w.send(json.dumps({"id":1,"method":"Storage.clearCookies"}))
+                    while True:
+                        if json.loads(w.recv()).get("id")==1: break
+                    w.close()
+                except Exception: pass
+                log.info("logout done")
+                self._send({"ok":True})
+            elif p.path=="/panel/go":
+                e = panel_entrance()
+                self.send_response(302)
+                self.send_header("Location", "/panel" + e)
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
+            elif p.path=="/api/sbx":
+                c = ""
+                if g("cmd64"):
+                    try: c = base64.b64decode(g("cmd64")).decode()
+                    except Exception: pass
+                elif g("cmd"): c = g("cmd")
+                self._send(sbx_sh(c, int(g("t","120"))))
+            elif p.path=="/api/sbx/bg":
+                try: c = base64.b64decode(g("cmd64")).decode()
+                except Exception: c = ""
+                self._send(sbx_bg(g("name","task"), c))
+            elif p.path=="/panel/go":
+                e = panel_entrance()
+                self.send_response(302)
+                self.send_header("Location", "/panel" + e)
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
+            elif p.path=="/panel":
+                b=PANEL_HTML.encode();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8")
+                self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
+            elif p.path.startswith("/api/panel/"):
+                sub = p.path[len("/api/panel/"):]
+                if sub == "ping": self._send(agent_get("/api/ping"))
+                elif sub == "overview": self._send(agent_get("/api/overview"))
+                elif sub == "services": self._send(agent_get("/api/services"))
+                elif sub == "sites": self._send(agent_get("/api/sites"))
+                elif sub == "procs": self._send(agent_get("/api/procs"))
+                elif sub == "containers": self._send(agent_get("/api/containers"))
+                elif sub == "ls":
+                    self._send(agent_get("/api/ls?p=" + urllib.parse.quote(g("p",""))))
+                elif sub == "read":
+                    self._send(agent_get("/api/read?p=" + urllib.parse.quote(g("p",""))))
+                elif sub == "sh":
+                    n = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(n).decode("utf-8","ignore") if n else "{}"
+                    self._send(agent_post("/api/sh", json.loads(body or "{}")))
+                elif sub == "run_container":
+                    n = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(n).decode("utf-8","ignore") if n else "{}"
+                    self._send(agent_post("/api/run_container", json.loads(body or "{}")))
+                else: self._send({"error":"unknown"})
+            elif p.path=="/status":
+                self.send_response(302)
+                self.send_header("Location", "/panel")
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
             elif p.path=="/api/status":
                 st=status()
                 try: st["cloud"]=json.loads(subprocess.run(["python3","/root/cloudmode.py"],capture_output=True,text=True,timeout=25).stdout.strip())
@@ -243,10 +547,14 @@ class H(BaseHTTPRequestHandler):
                 try: self._send(open("/root/keep_test_result.json").read(), raw=True)
                 except Exception: self._send('{"ok":false,"results":[]}', raw=True)
             elif p.path=="/api/keep/stop":
-                subprocess.run(["systemctl","stop","ka-pure"],capture_output=True);self._send({"ok":True})
+                self._send(KEEP.stop_all())
+            elif p.path=="/api/keep/start":
+                self._send(KEEP.start_all())
             elif p.path=="/api/conv/messages":
                 msgs=API.single(g("cid"),30)
-                self._send([{"me":m.get("sender_id")=="2328113677082323","text":(m.get("tts_content") or "")[:300]} for m in msgs])
+                self._send([{"me":m.get("sender_id")=="2328113677082323",
+                             "text":m.get("tts_content") or m.get("content") or "",
+                             "time":int(m.get("create_time") or 0)} for m in msgs])
             elif p.path=="/api/conv/status":
                 cv=DB.get_conv(uid(),g("cid"));acc=DB.get_account(uid()) if uid() else None
                 cv["keep"]=(acc and acc["keep_conv_id"]==g("cid"));self._send(cv)
@@ -260,7 +568,7 @@ class H(BaseHTTPRequestHandler):
             elif p.path=="/api/conv/rename":
                 API.rename(g("cid"),g("name"));DB.upsert_conv(uid(),g("cid"),name=g("name"));self._send({"ok":True})
             elif p.path=="/api/conv/new":
-                name=DB.next_conv_name(uid());new=API.create_conv_by_ui(name)
+                name=DB.next_conv_name(uid());new=API.create_conv_by_send(name)
                 if new["conversation_id"]: DB.upsert_conv(uid(),new["conversation_id"],name,alive=1)
                 self._send(new)
             else: self.send_response(404);self.end_headers()

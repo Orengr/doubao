@@ -39,11 +39,11 @@ def main():
         log.error("账号或保活会话未配置，退出"); return
     log.info("启动 纯保活 uid=%s 会话=%s（小任务每3-5分钟随机一次，不管隧道）", uid, acc["keep_conv_id"])
     last_task = 0; n = 0
-    next_gap = random.randint(180, 300)  # 3~5 分钟内随机
+    next_gap = random.randint(60, 90)  # 3~5 分钟内随机
 
     while True:
         n += 1
-        time.sleep(30)  # 每 30 秒检查一次是否到间隔
+        time.sleep(10)  # 每 30 秒检查一次是否到间隔
         s = DB.all_settings(uid)
         acc = DB.get_account(uid)
         cid = acc["keep_conv_id"] if acc else ""
@@ -77,7 +77,7 @@ def main():
             log.error("发送无有效回复（未落库）"); continue
         last_task = now
         next_gap = random.randint(180, 300)  # 本次完成后重新抽 3~5 分钟
-        log.info("下一次小任务将在 %d 秒后", next_gap)
+        log.info("下一次小任务将在 %d 秒后（维持沙箱活跃）", next_gap)
         reply = API.extract_reply(sse)
         log.info("豆包回复: %s", reply[:100])
         hit = API.death_check(sse, s["death_keywords"])
