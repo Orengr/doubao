@@ -184,3 +184,10 @@ POST /chat/completion，client_meta.local_conversation_id="local_<ts>" + convers
 - 沙箱：17800/ping ok，frp 两隧道 online，保活小任务 3-5min 随机，哨兵 1s/3fail
 - 会话：老王（P）存活，保活运行中，豆包持续执行 ensure.sh / 小任务
 - 1Panel 直连 18090 根路径显示「暂时无法访问」是 1Panel 自身安全入口（需带随机路径），非故障
+
+
+## 1Panel 安全入口（2026-11-15 23:33）
+- 导航页「1Panel 面板」原 href=/panel/ 根路径 → 1Panel 自带「暂时无法访问 / 已开启安全入口登录」拦截页，不是真面板。
+- 让豆包在沙箱执行 `1pctl user-info` 读到真实入口：`http://114.215.204.238:18090/cSK41ajJX5`，用户 `1panel_admin`，密码 `Jwgk8CoJfnts`。
+- 导航页磁贴改为直达 `/panel/cSK41ajJX5`（经 80 端口 proxy 到 18090 安全入口，实测 200、标题 loading…=1Panel 前端）。补「1Panel 登录信息」卡显示入口/用户名/密码。
+- 不新开端口；panel.moin520.me 同样走 80。
