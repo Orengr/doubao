@@ -77,3 +77,37 @@ sh $PEND/bin/start_all.sh
 - **Docker 不可用**（沙箱内核能力限制），容器化用 `proot` 替代
 - 实例可能被平台回收，重建后 `sbx_guard` 自动恢复（约 20-30 秒）
 - 不使用 cloudflared（与 frp 重复，已停用）
+
+
+---
+
+## 📚 文档导航
+
+### 给豆包/AI 读的（自动部署）
+
+| 文档 | 用途 |
+|---|---|
+| **[AUTODEPLOY.md](AUTODEPLOY.md)** | **豆包自动部署总控指令**（让它读这个） |
+| [docs/11-部署指令卡.md](docs/11-部署指令卡.md) | 可直接复制粘贴给豆包的指令片段 |
+| [docs/10-豆包助手指令.md](docs/10-豆包助手指令.md) | 豆包助手常用指令集 |
+| [docs/09-额度与执行通道.md](docs/09-额度与执行通道.md) | **如何避免额度不足** |
+| [QUICKSTART.md](QUICKSTART.md) | 3 分钟快速开始 |
+| [PREPARE.md](PREPARE.md) | 部署前准备清单 |
+
+### 给人读的
+
+| 文档 | 用途 |
+|---|---|
+| [docs/MANUAL.md](docs/MANUAL.md) | 大白话使用手册 |
+| [docs/HTTP_API.md](docs/HTTP_API.md) | 豆包接口速查 |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 排错手册 |
+| [docs/STATUS.md](docs/STATUS.md) | 开发进展记录 |
+| [docs/ACCEPTANCE_TEST.md](docs/ACCEPTANCE_TEST.md) | 验收测试与实测记录 |
+
+### 一句话部署
+
+把这句话发给豆包：
+
+```
+请读取 https://raw.githubusercontent.com/Orengr/doubao/main/AUTODEPLOY.md 并按它执行全自动部署
+```

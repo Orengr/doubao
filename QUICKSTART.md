@@ -1,73 +1,49 @@
-# DoubaoBox · 5 分钟快速开始
+# 快速开始（3 分钟）
 
-## 前置条件
+## 给豆包一句话
 
-1. 一台有公网 IP 的服务器（1 核 512M 即可）—— 这就是「中转机」，
-   是你自己的机器，不是项目作者的服务器
-2. 一个豆包账号
+> 请读取 https://raw.githubusercontent.com/Orengr/doubao/main/AUTODEPLOY.md 并按它执行全自动部署
 
-## 步骤
+## 手动部署（自己动手）
 
-### 1. 部署中转机（1 分钟）
+### 沙箱侧
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<你>/<仓库>/main/install.sh -o install.sh
-bash install.sh
+cd /home/user/.dsh_pend
+git clone --depth 1 https://github.com/Orengr/doubao.git moin-deploy
+cd moin-deploy
+
+# 预编译包放到 pkg/（见 Releases）
+mkdir -p /home/user/.dsh_pend/pkg
+
+# 一键安装（后台跑，避免中断）
+setsid nohup sh install_all.sh > /tmp/install.log 2>&1 < /dev/null &
+sleep 120 && tail -30 /tmp/install.log
 ```
 
-按提示输入服务器公网 IP，完成后会显示：
+### 中转机侧
 
-```
-【中转机信息】
-  frps 地址:  1.2.3.4:7000
-  访问入口:   http://1.2.3.4/
-  1Panel:     http://1.2.3.4/panel/
-```
-
-### 2. 部署沙箱（2 分钟）
-
-打开豆包 → **新建会话** → 切换到 **【云电脑】模式**（重要！）
-
-把 `/root/SANDBOX_CMDS.txt` 的全部内容发给它。
-
-等待执行完成，看到 `===== 部署完成 =====` 即可。
-
-### 3. 登录管理台（30 秒）
-
-打开：
-
-```
-http://<中转机IP>:18800/
+```bash
+git clone --depth 1 https://github.com/Orengr/doubao.git /root/moin
+echo "<沙箱token>" > /root/sbx_token.txt
+systemctl enable --now moin-unified sbx-guard ka-pure tunnel-watch
 ```
 
-点左上角 **≡** → **扫码登录** → 页面显示二维码 → **用豆包 App 扫描**
+## 访问
 
-登录成功后，保活才有作用（豆包需要登录才能操作沙箱）。
+| 入口 | 地址 |
+|---|---|
+| 面板 | `http://<IP>/panel` |
+| 管理台 | `http://<IP>/lite/` |
+| 导航页 | `http://<IP>/` |
 
-> ⚠️ 这是唯一需要手动的一步。session 有效期 6 小时，
-> 之后 `renew-activator` 会自动续期，只要保持活跃就不会掉线。
+## 沙箱重置后
 
-### 4. 安装面板（1 分钟）
-
-在豆包对话里继续发：
-
+```bash
+sh /home/user/.dsh_pend/bin/start_all.sh
 ```
-帮我运行 bash /home/user/.dsh_pend/bin/install-1panel.sh
-```
 
-### 5. 访问
+## 下一步
 
-- 导航页：`http://1.2.3.4/`
-- 面板：`http://1.2.3.4/panel/`
-- 面板账号：**admin / 123456**（默认，可用 `1pctl update password` 修改）
-
-## 常见问题
-
-**Q: 豆包拒绝执行怎么办？**
-A: 确认已切到【云电脑】模式，而不是【对话】模式。分批发送也可以。
-
-**Q: 服务过一会就没了？**
-A: 沙箱会定期重建。让豆包执行 `sh /home/user/.dsh_pend/bin/ensure.sh` 恢复。
-
-**Q: 提示登录失效？**
-A: 打开 `http://1.2.3.4:18800/` 扫码登录。
+- 看面板 → 网站 → 新建网站
+- 或看 `docs/MANUAL.md` 详细手册
