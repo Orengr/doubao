@@ -40,7 +40,9 @@ def activate(uid, conv_id=None):
     # 确保当前浏览器/发送器用这个账号的 cookie
     subprocess.run(["python3","/root/inject_ck.py", acc["cookie_file"]], capture_output=True, text=True, timeout=40)
     subprocess.run(["systemctl","restart","ka-pure"], capture_output=True, text=True, timeout=30)
-    return {"ok": True, "uid": uid, "conv_id": conv_id, "service": "restarted"}
+    # 立即触发一次可见保活（用户点"启用保活"马上能看到消息和状态）
+    once = subprocess.run(["python3","/root/ka_once.py"], capture_output=True, text=True, timeout=130)
+    return {"ok": True, "uid": uid, "conv_id": conv_id, "service": "restarted", "immediate": once.stdout.strip()[:300]}
 
 if __name__ == "__main__":
     c = sys.argv[1]

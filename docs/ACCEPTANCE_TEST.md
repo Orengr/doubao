@@ -43,3 +43,28 @@ python3 /tmp/ali.py "rm -f /root/ck_*.txt /root/doubao_accounts.db /root/active_
 - 验收只认 /im/chain/single 里查得到的消息
 - cookie 有效期内绝不重新登录（单点会话）
 - 真凭证文件不进 GitHub（.gitignore 已排除）
+
+
+## v3 更新（2026-11-15 20:20）
+### 已实现并实测
+1. **保活状态显示在开关旁**：「② 账号/保活开关」标题与按钮行各一处，●运行中/●已停止
+2. **会话列表可点开**：点任意会话 → 弹窗显示历史聊天记录 + 发送框 + 实时等豆包回复；保活会话排第一、绿色框；外部"发送消息/消息记录"卡已删除
+3. **启用保活立即发送**：keepctl.activate 触发 ka_once.py，点完马上发一条保活自检并返回豆包回复（不再等 30 分钟）
+4. **会话死亡/存活标记**：conv_status 表，列表红色死亡/绿色存活
+5. **死亡检测**：发送后读 SSE 回复，命中「不能执行/拒绝执行/高风险/高危操作…」→ 自动标记死亡（只标一次）、不再保活；实测 20:13:55 命中「高风险」自动标记成功
+6. **手动改存活**：会话弹窗「标记存活」，下次保活重新读回复，无拒绝词则继续
+7. **死亡自动新开会话**：设置项 auto_new_on_dead，默认 0（关），用户开启才做
+8. **所有开关写数据库**：settings 表（auto_new_on_dead / rename_prefix / rename_style / rename_counter / keep_interval_sec / wake_interval_sec / cloud_mode / death_keywords），换账号登录记住
+9. **重命名接口**：POST /alice/conversation/update {conversation_id,name}（实测成功）；新会话命名前缀+后缀(A/B/C 或 1/2/3)可配置，预览「老王（D）」
+10. **云电脑模式**：☁️云电脑 / 💬对话 双按钮，当前选中高亮
+11. **网页发消息+实时回复**：/api/conv/send 返回豆包 reply，实测成功
+
+### 已知限制（如实标注）
+- 新建会话接口：豆包新建会话由"发首条消息"触发，纯接口 create 未打通（/im/conversation/create cmd1100 参数错误、need_create_conversation 报 710020202）。管理台「➕新建会话」会明确提示：请在豆包页面新建，管理台自动读取后可重命名/设保活。因「死亡自动新开」默认关闭，不影响主流程。
+- 4/5（App 化、多会话同时保活）为后续规划，未实现。
+
+### 抓到的新接口
+- /alice/conversation/update（重命名）
+- /im/conversation/create cmd=1100 uplink=create_conv_uplink_body（参数未全破）
+- /im/conversation/modify（模型配置，非重命名）
+- 云电脑模式：无独立切换接口，账号级 localStorage mode_select_value=9，发消息时 option.general_task_param 生效
