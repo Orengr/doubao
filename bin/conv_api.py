@@ -311,8 +311,8 @@ def send_and_get_ids(conv_id, text, create=False, auto_save=True):
         if err in raw:
             return False, None, None, raw
     import re as _re
-    mid = (_re.search(r'message_id[^0-9]{1,6}(\d{10,})', raw) or [None, None])[1]
-    conv = (_re.search(r'conversation_id[^0-9]{1,6}(\d{10,})', raw) or [None, None])[1]
+    mid = (_re.search(r'message_id[^0-9]{1,12}(\d{10,})', raw) or [None, None])[1]
+    conv = (_re.search(r'conversation_id[^0-9]{1,12}(\d{10,})', raw) or [None, None])[1]
     ok = bool(mid) and bool(conv)
     if not ok:
         return False, mid, conv, raw
