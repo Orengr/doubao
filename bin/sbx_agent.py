@@ -94,17 +94,31 @@ def backup():
     ts = time.strftime("%Y%m%d_%H%M%S")
     outdir = os.path.join(PEND, "backup")
     os.makedirs(outdir, exist_ok=True)
+
     sqlfile = os.path.join(outdir, "mysql_" + ts + ".sql")
     mysqldump = PEND + "/server/mysql/bin/mysqldump"
-    if os.path.exists(mysqldump):
-        sh(mysqldump + " --socket=" + MYSQL_SOCK + " -u root --all-databases > " + sqlfile, 120)
+    mysql_ok = False
+    if os.path.exists(mysqldump) and os.path.exists(MYSQL_SOCK):
+        rc, _ = sh(mysqldump + " --socket=" + MYSQL_SOCK + " -u root --all-databases > " + sqlfile, 120)
+        mysql_ok = (rc == 0 and os.path.exists(sqlfile))
+
+    dirs = [d for d in ("www", "conf", "state", "tasks") if os.path.isdir(os.path.join(PEND, d))]
     tarf = os.path.join(outdir, "data_" + ts + ".tar.gz")
-    rc, out = sh("cd " + PEND + " && tar czf " + tarf + " www conf state 2>/dev/null", 180)
+    tar_ok = False
+    if dirs:
+        rc, out = sh("cd " + PEND + " && tar czf " + tarf + " " + " ".join(dirs) + " 2>&1", 180)
+        tar_ok = (rc == 0 and os.path.exists(tarf))
+
     size = os.path.getsize(tarf) if os.path.exists(tarf) else 0
-    return {"ok": rc == 0, "file": tarf, "size": size, "mysql_dump": sqlfile if os.path.exists(sqlfile) else ""}
-
-
-# ============ 域名绑定 / SSL / 反向代理 / 站点管理 ============
+    return {
+        "ok": tar_ok or mysql_ok,
+        "file": tarf if tar_ok else "",
+        "size": size,
+        "mysql_dump": sqlfile if mysql_ok else "",
+        "packed_dirs": dirs,
+        "mysql_ok": mysql_ok,
+        "tar_ok": tar_ok,
+    }
 def site_list():
     """完整站点信息：含域名、端口、SSL、状态"""
     out = []
