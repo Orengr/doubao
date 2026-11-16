@@ -11,6 +11,7 @@ import accounts_db as DB
 import conv_api as API
 
 LOG = "/root/ka_boot.log"
+BOOT_STATE = "/root/ka_boot_state.json"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
                     handlers=[logging.FileHandler(LOG, encoding="utf-8")])
 log = logging.getLogger("boot")
@@ -34,10 +35,33 @@ def tunnel_alive():
             pass
     return False
 
+def load_boot_state():
+    try:
+        return json.load(open(BOOT_STATE))
+    except Exception:
+        return {}
+
+def save_boot_state(st):
+    try:
+        json.dump(st, open(BOOT_STATE, "w"))
+    except Exception:
+        pass
+
 def main():
-    log.info("=== 保活启动器 ===")
-    attempt = 0
-    backoff = 300
+    st = load_boot_state()
+    attempt = st.get("attempt", 0)
+    backoff = st.get("backoff", 300)
+    last_fire = st.get("last_fire", 0)
+
+    # 如果距上次尝试还没到退避时间，先等一下
+    now = time.time()
+    if last_fire and (now - last_fire) < backoff:
+        wait = int(backoff - (now - last_fire))
+        log.info("=== 恢复保活启动器（继承状态）===")
+        log.info("上次尝试在 %d 秒前，还需等待 %d 秒", int(now-last_fire), wait)
+        time.sleep(wait)
+    else:
+        log.info("=== 保活启动器启动（新状态）===")
 
     while True:
         attempt += 1
@@ -77,7 +101,11 @@ def main():
         except Exception as e:
             log.error("异常: %s", str(e)[:150])
 
-        log.info("退避 %d 秒后重试", backoff)
+        st["attempt"] = attempt
+        st["last_fire"] = time.time()
+        st["backoff"] = backoff
+        save_boot_state(st)
+        log.info("退避 %d 秒后重试（第%d次）", backoff, attempt)
         time.sleep(backoff)
         backoff = min(backoff * 2, 3600)
 
