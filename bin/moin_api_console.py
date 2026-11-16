@@ -628,6 +628,7 @@ class H(BaseHTTPRequestHandler):
                     "sites": "/api/sitelist", "sitelist": "/api/sitelist",
                     "databases": "/api/databases", "procs": "/api/procs",
                     "containers": "/api/containers", "cron": "/api/cron", "nginx_test": "/api/nginx_test",
+                    "phpinfo": "/api/phpinfo", "disk": "/api/disk",
                 }
                 POST_MAP = {
                     "site_create": "/api/site_create", "site_add_domain": "/api/site_add_domain",
@@ -638,6 +639,8 @@ class H(BaseHTTPRequestHandler):
                 }
                 if sub in GET_MAP:
                     self._send(agent_get(GET_MAP[sub]))
+                elif sub == "site_log":
+                    self._send(agent_get("/api/site_log?name=" + urllib.parse.quote(g("name","")) + "&n=" + g("n","50")))
                 elif sub == "tables":
                     self._send(agent_get("/api/tables?db=" + urllib.parse.quote(g("db",""))))
                 elif sub == "dbquery":

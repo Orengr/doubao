@@ -194,6 +194,29 @@ def nginx_reload():
     rc2, out2 = sh("sudo -n nginx -s reload 2>&1", 15)
     return {"ok": rc2 == 0, "out": (out + out2)[:300]}
 
+
+def site_log(name, lines=50):
+    n = re.sub(r"[^A-Za-z0-9_-]", "", name)[:40]
+    for cand in [PEND+"/log/nginx_"+n+".log", PEND+"/log/site_"+n+".log", "/www/wwwlogs/"+n+".log"]:
+        if os.path.exists(cand):
+            try:
+                ls = open(cand, errors="ignore").readlines()[-lines:]
+                return {"ok": True, "file": cand, "lines": "".join(ls)}
+            except Exception as e:
+                return {"ok": False, "error": str(e)[:100]}
+    return {"ok": False, "error": "无日志文件"}
+
+def php_info():
+    php = PEND + "/server/php/bin/php"
+    if not os.path.exists(php): return {"ok": False, "error": "PHP 未安装"}
+    rc, out = sh(php + " -v 2>&1 | head -2", 10)
+    rc2, mods = sh(php + " -m 2>&1 | head -20", 10)
+    return {"ok": True, "version": out.strip(), "modules": mods.strip().split(chr(10))[:15]}
+
+def disk_usage():
+    rc, out = sh("du -sh " + PEND + "/* 2>/dev/null | sort -rh | head -12", 30)
+    return [l.split(chr(9)) for l in out.strip().split(chr(10)) if chr(9) in l]
+
 def overview():
     rc, up = sh("cat /proc/uptime")
     up_s = float(up.split()[0]) if rc == 0 and up.split() else 0
@@ -231,17 +254,6 @@ def processes():
 
 def services():
     return svc_status()
-
-def sites():
-    """站点：扫描 /www/wwwroot 或 PEND/www"""
-    out = []
-    for base in ["/www/wwwroot", os.path.join(PEND, "www")]:
-        if os.path.isdir(base):
-            for d in sorted(os.listdir(base)):
-                p = os.path.join(base, d)
-                if os.path.isdir(p):
-                    out.append({"name": d, "path": p, "files": len(glob.glob(p + "/*"))})
-    return out
 
 def containers():
     """容器化运行（proot 隔离），列出运行中的"""
@@ -284,6 +296,10 @@ class H(BaseHTTPRequestHandler):
                 return self._s(200, db_tables(q.get("db",[""])[0]))
             if p == "/api/dbquery":
                 return self._s(200, mysql_q(q.get("q",[""])[0]))
+            if p == "/api/phpinfo": return self._s(200, php_info())
+            if p == "/api/disk": return self._s(200, disk_usage())
+            if p == "/api/site_log":
+                return self._s(200, site_log(q.get("name",[""])[0], int(q.get("n",["50"])[0])))
             if p == "/api/overview": return self._s(200, overview())
             if p == "/api/procs": return self._s(200, processes())
             if p == "/api/services": return self._s(200, services())
