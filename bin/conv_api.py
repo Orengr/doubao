@@ -72,10 +72,35 @@ def _db_post(path, body):
     return _sp.run(cmd,capture_output=True,text=True,timeout=25).stdout
 
 def recent(limit=30):
-    b={"cmd":3200,"uplink_body":{"pull_recent_conv_chain_uplink_body":{"conv_version":0,"limit":limit,"message_count_per_conv":1,"option":{"not_need_message":False,"need_complete_conversation":True,"need_coco_conversation":True,"need_coco_bot":True,"pc_pin_query_type":0},"api_version":1,"direction":3}},"sequence_id":"c1","channel":2,"version":"1"}
-    try: return json.loads(_db_post("im/chain/recent_conv",b)).get("downlink_body",{}).get("pull_recent_conv_chain_downlink_body",{}).get("cells",[])
-    except Exception: return []
-
+    """读取最近会话列表（浏览器上下文 + 完整URL参数，已验证）"""
+    body = {"cmd": 3200, "uplink_body": {"pull_recent_conv_chain_uplink_body": {
+        "conv_version": 0, "limit": limit,
+        "filter": {"conversation_type": [], "project_filter": 0, "device_filter": 1},
+        "message_count_per_conv": 1,
+        "option": {"not_need_message": False, "need_complete_conversation": True,
+                   "need_coco_bot": True, "need_pc_pin_chain": True,
+                   "pc_pin_query_type": 1, "exclude_archive": True, "only_archive": False},
+        "api_version": 1, "direction": 3}},
+        "sequence_id": "recent-1", "channel": 2, "version": "1"}
+    js = """
+(async()=>{
+ try{
+  const ck=Object.fromEntries(document.cookie.split('; ').map(s=>{const i=s.indexOf('=');return[s.slice(0,i),s.slice(i+1)];}));
+  const p=new URLSearchParams({version_code:'20800',language:'zh',device_platform:'web',doubao_device_platform:'web',aid:'497858',real_aid:'497858',pkg_type:'release_version',pc_version:'3.45.6',doubao_pc_version:'3.45.6',device_id:ck['s_v_web_id']||'',web_id:ck['s_v_web_id']||'',tea_uuid:ck['s_v_web_id']||''});
+  const r=await fetch('/im/chain/recent_conv?'+p.toString(),{method:'POST',credentials:'include',headers:{'Content-Type':'application/json; encoding=utf-8','Agw-Js-Conv':'str, str'},body:%BODY%});
+  const t=await r.text();
+  let j=null; try{j=JSON.parse(t)}catch(e){ return ''; }
+  const db=j.downlink_body||{};
+  const cells=(db.pull_recent_conv_chain_downlink_body||{}).cells||[];
+  return JSON.stringify(cells);
+ }catch(e){return '';}
+})()
+    """.replace("%BODY%", json.dumps(json.dumps(body)))
+    try:
+        raw = page_eval(js, 60) or ""
+        return json.loads(raw) if raw else []
+    except Exception:
+        return []
 def sessions():
     return [{"id":c.get("conversation",{}).get("conversation_id",""),
              "name":c.get("conversation",{}).get("name","") or "(未命名)"} for c in recent()]
