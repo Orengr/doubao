@@ -19,8 +19,19 @@ def main():
     except Exception: a={}
     f=a.get("cookie_file") or "/root/ck_live2.txt"
     if not os.path.exists(f): print("NO_COOKIE_FILE",f); return
-    pairs=[l.strip() for l in open(f) if "=" in l]
-    cookies=[{"name":l.split("=",1)[0],"value":l.split("=",1)[1],"domain":".doubao.com","path":"/","secure":True,"httpOnly":False,"sameSite":"None"} for l in pairs]
+    raw = open(f, encoding="utf-8").read().strip()
+    # 支持两种格式：分号分隔的单行，或每行一个
+    if ";" in raw:
+        parts = [x.strip() for x in raw.split(";") if "=" in x]
+    else:
+        parts = [x.strip() for x in raw.splitlines() if "=" in x]
+    cookies = []
+    for l in parts:
+        n, v = l.split("=", 1)
+        n = n.strip(); v = v.strip()
+        if n and v:
+            cookies.append({"name": n, "value": v, "domain": ".doubao.com",
+                            "path": "/", "secure": True, "httpOnly": False, "sameSite": "None"})
     bws=json.loads(urllib.request.urlopen(CDP+"/json/version").read())["webSocketDebuggerUrl"]
     w=websocket.create_connection(bws,timeout=20)
     w.send(json.dumps({"id":1,"method":"Storage.setCookies","params":{"cookies":cookies}}))
