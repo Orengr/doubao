@@ -332,3 +332,56 @@ def send_and_get_ids(conv_id, text, create=False, auto_save=True):
         except Exception:
             pass
     return True, mid, conv, raw
+
+
+# ---- 会话健康检查（基于修复后的 recent 接口）----
+def conv_health(conv_id, uid=None):
+    """检查会话是否健康。
+    返回 {"exists":bool, "msg_count":int, "last_sender":str, "last_text":str, "alive":bool}
+    """
+    import json as _json
+    cells = recent(50)
+    target = None
+    for c in cells:
+        cv = c.get("conversation", {})
+        if str(cv.get("conversation_id")) == str(conv_id):
+            target = cv
+            break
+    if not target:
+        return {"exists": False, "msg_count": 0, "last_sender": "", "last_text": "", "alive": False}
+
+    msgs = target.get("messages") or []
+    last = msgs[-1] if msgs else {}
+    sid = str(last.get("sender_id", ""))
+    raw = last.get("content") or ""
+    txt = ""
+    try:
+        j = _json.loads(raw) if isinstance(raw, str) else raw
+        txt = (j.get("text") or "")[:200]
+    except Exception:
+        txt = str(raw)[:200]
+
+    return {
+        "exists": True,
+        "msg_count": len(msgs),
+        "last_sender": sid,
+        "last_text": txt,
+        "alive": len(msgs) > 0,
+    }
+
+def list_conv_with_health(limit=30):
+    """会话列表 + 健康状态"""
+    out = []
+    for c in recent(limit):
+        cv = c.get("conversation", {})
+        cid = str(cv.get("conversation_id", ""))
+        if not cid or cid == "0":
+            continue
+        msgs = cv.get("messages") or []
+        out.append({
+            "conv_id": cid,
+            "name": cv.get("name") or "(未命名)",
+            "msg_count": len(msgs),
+            "alive": len(msgs) > 0,
+        })
+    return out

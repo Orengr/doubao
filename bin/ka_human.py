@@ -99,6 +99,17 @@ def main():
             time.sleep(300)
             continue
 
+        # 发送前先检查会话健康（用修复后的 recent 接口）
+        try:
+            h = API.conv_health(cid)
+            if not h["exists"]:
+                log.warning("会话 %s 不存在，跳过本轮", cid)
+                time.sleep(600)
+                continue
+            log.info("会话健康: %d 条消息, 最后发送者 %s", h["msg_count"], h["last_sender"][:10])
+        except Exception as e:
+            log.warning("健康检查失败: %s", str(e)[:100])
+
         for i in range(burst):
             if st["count"] >= DAILY_LIMIT:
                 break
