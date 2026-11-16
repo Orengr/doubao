@@ -199,7 +199,7 @@ pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:1
 </div>
 <main id="view"><div class="card dim">加载中…</div></main>
 <script>
-var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["files","文件管理","▤","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
+var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["phpinfo","PHP 环境","◐","监控"],["files","文件管理","▤","运维"],["disk","磁盘占用","◪","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
 var cur="overview",S={},es=null;
 function agentErr(o){var m=(o&&(o.error||o.detail))||'沙箱暂时离线';return '沙箱未连接：'+m+'（实例可能正在重建，约20秒后自动恢复）'}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -222,6 +222,8 @@ async function load(){
     else if(cur==='procs'){S.p=await api('/api/panel/procs');if(!Array.isArray(S.p))throw new Error(agentErr(S.p));v.innerHTML=procsHTML(S.p)}
     else if(cur==='containers'){S.c=await api('/api/panel/containers');if(!Array.isArray(S.c))throw new Error(agentErr(S.c));v.innerHTML=contHTML(S.c)}
     else if(cur==='cron'){S.cr=await api('/api/panel/cron');if(!Array.isArray(S.cr))throw new Error(agentErr(S.cr));v.innerHTML=cronHTML(S.cr)}
+    else if(cur==='phpinfo'){S.ph=await api('/api/panel/phpinfo');if(!S.ph||!S.ph.ok)throw new Error(agentErr(S.ph));v.innerHTML=phpHTML(S.ph)}
+    else if(cur==='disk'){S.dk=await api('/api/panel/disk');if(!Array.isArray(S.dk))throw new Error(agentErr(S.dk));v.innerHTML=diskHTML(S.dk)}
     else if(cur==='backup'){v.innerHTML=backupHTML()}
     else if(cur==='ftp'){v.innerHTML=ftpHTML()}
     else if(cur==='terminal'){v.innerHTML=termHTML();bindTerm()}
@@ -334,6 +336,31 @@ function contHTML(c){
    +'<h2>启动应用</h2><div class="card"><div style="margin-bottom:8px"><input id="cn" placeholder="应用名，如 web1"></div><div style="margin-bottom:8px"><input id="cr" placeholder="rootfs 路径（可选）"></div><div style="margin-bottom:10px"><input id="cc" placeholder="命令，如 python3 -m http.server 8080"></div><button onclick="runC()">启动</button></div><pre id="cout" class="hide"></pre>';
 }
 async function runC(){var b={name:document.getElementById('cn').value||'app',rootfs:document.getElementById('cr').value||'',cmd:document.getElementById('cc').value||'/bin/sh'};var r=await api('/api/panel/run_container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});var el=document.getElementById('cout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2)}
+function phpHTML(p){
+  return '<h2>PHP 环境</h2><div class="card">'
+   +'<div class="row"><span class="k">版本</span><span class="v">'+esc((p.version||"").split("\n")[0])+'</span></div>'
+   +'<div class="row"><span class="k">二进制</span><span class="v dim">server/php/bin/php</span></div>'
+   +'</div>'
+   +'<h2>已加载模块 ('+(p.modules||[]).length+')</h2><div class="card">'
+   +(p.modules||[]).map(function(m){return '<div class="row"><span class="v">'+esc(m)+'</span></div>'}).join('')
+   +'</div>';
+}
+function diskHTML(d){
+  var total=0;
+  d.forEach(function(x){ var s=(x[0]||"").trim(); if(/G$/.test(s)) total+=parseFloat(s)*1024; else if(/M$/.test(s)) total+=parseFloat(s); });
+  return '<h2>持久卷占用 (<span class="dim">'+d.length+' 项</span>)</h2><div class="card">'
+   +d.map(function(x){
+     var size=(x[0]||"").trim(), path=(x[1]||"").trim();
+     var num=parseFloat(size)||0;
+     var isG=/G/.test(size);
+     var mb=isG?num*1024:num;
+     var pct=total>0?Math.min(100,Math.round(mb/total*100)):0;
+     return '<div style="margin-bottom:12px"><div class="row" style="border:0;padding:4px 0"><span class="k">'+esc(path.split("/").pop())+'</span><span class="v">'+esc(size)+'</span></div>'
+       +'<div class="bar '+barCls(pct)+'"><i style="width:'+pct+'%"></i></div>'
+       +'<div class="tip">'+esc(path)+'</div></div>';
+   }).join('')
+   +'</div>';
+}
 function cronHTML(c){
   return '<h2>计划任务</h2><div class="card">'+(c.length?c.map(function(x){return '<div class="row"><span class="v dim">'+esc(x)+'</span></div>'}).join(''):'<div class="dim">暂无计划任务</div>')+'</div>'
    +'<h2>新建计划任务</h2><div class="card"><input id="crn" placeholder="cron 表达式，如 */5 * * * *"><div style="margin-top:8px"><input id="crc" placeholder="命令，如 /home/user/.dsh_pend/bin/backup.sh"></div><div style="margin-top:9px"><button onclick="addCron()">添加</button></div></div><pre id="crout" class="hide"></pre>';

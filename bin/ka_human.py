@@ -24,7 +24,7 @@ STATE_F = "/root/ka_human_state.json"
 
 DAILY_LIMIT = int(os.environ.get("KA_DAILY", "60"))
 BURST_MIN, BURST_MAX = 2, 5          # 每次会话条数
-IN_BURST_GAP = (40, 90)              # 条间隔 40-90 秒
+IN_BURST_GAP = (90, 180)             # 条间隔 90-180 秒（实测 90 秒仍会限流，取更保守值）
 REST_GAP = (25 * 60, 50 * 60)        # 会话间隔 25-50 分钟
 NIGHT_GAP = (90 * 60, 150 * 60)      # 深夜 90-150 分钟
 
