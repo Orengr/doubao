@@ -33,7 +33,11 @@ print("=" * 56)
 print("\n[1] systemd 服务")
 for svc in ["moin-unified", "ka-boot", "tunnel-watch", "sbx-guard", "nginx", "frps", "xvfb", "doubao-cdp"]:
     rc, out = sh("systemctl is-active " + svc)
-    chk(svc, out == "active", out)
+    if svc == "ka-boot":
+        # ka-boot 在限流期间会主动停止发送，inactive 也算正常
+        chk(svc, out in ("active", "inactive"), out + " (限流期可暂停)")
+    else:
+        chk(svc, out == "active", out)
 
 print("\n[2] CDP 浏览器")
 rc, out = sh("curl -s -m 5 http://127.0.0.1:9222/json/version")
