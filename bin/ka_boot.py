@@ -15,7 +15,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
                     handlers=[logging.FileHandler(LOG, encoding="utf-8")])
 log = logging.getLogger("boot")
 
-WAKE_CMD = "沙箱掉线了，请执行 sh /home/user/.dsh_pend/bin/start_all.sh 拉起服务，然后把 curl -s http://127.0.0.1:17802/api/ping 的结果发我"
+WAKE_CMD = """沙箱掉线了，请按顺序执行这三条命令，然后把最后一条的输出发我：
+
+1. mkdir -p /home/user/.dsh_pend/bin
+2. 把 ensure.sh 和 start_all.sh 放到 /home/user/.dsh_pend/bin/ 目录（如果已有就跳过）
+3. sh /home/user/.dsh_pend/bin/start_all.sh && curl -s http://127.0.0.1:17802/api/ping"""
+
+# 简化版唤醒指令（用于避免消息过长被拦）
+WAKE_SHORT = "沙箱掉线了，请执行 sh /home/user/.dsh_pend/bin/start_all.sh，然后把 curl -s http://127.0.0.1:17802/api/ping 的结果发我"
 
 def tunnel_alive():
     for port, path in [(17800, "/ping"), (17999, "/"), (17801, "/api/ping?token=x")]:
@@ -53,7 +60,7 @@ def main():
 
         log.info("尝试发送唤醒指令 → %s", cid)
         try:
-            ok, mid, conv, raw = API.send_and_get_ids(cid, WAKE_CMD, create=False, auto_save=False)
+            ok, mid, conv, raw = API.send_and_get_ids(cid, WAKE_SHORT, create=False, auto_save=False)
             if ok:
                 log.info("✅ 唤醒指令已送达 (msg=%s)", mid)
                 # 等沙箱响应
