@@ -107,6 +107,7 @@ sh $PEND/bin/start_all.sh
 | [docs/HTTP_API.md](docs/HTTP_API.md) | 豆包接口速查 |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 排错手册 |
 | [docs/STATUS.md](docs/STATUS.md) | 开发进展记录 |
+| [docs/16-项目最终状态.md](docs/16-项目最终状态.md) | **项目交付总览（含 93 项测试与 5 个 bug 修复）** |
 | [docs/15-沙箱恢复傻瓜手册.md](docs/15-沙箱恢复傻瓜手册.md) | **沙箱掉了怎么办（傻瓜教程）** |
 | [docs/14-项目完成度.md](docs/14-项目完成度.md) | **当前进度与 88 项实测记录** |
 | [docs/13-频率限制实测.md](docs/13-频率限制实测.md) | 限流阈值与保活节奏依据 |
