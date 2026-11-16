@@ -16,7 +16,10 @@ import conv_api as API
 ACTIVE_F = "/root/active_account.json"
 LOG_F = "/root/tunnel_watch.log"
 STATE_F = "/root/tunnel_watch_state.json"
-WAKE_CMD = "沙箱隧道断了，请执行 sh /home/user/.dsh_pend/bin/ensure.sh 重新拉起所有服务，执行完把最后 10 行输出发我"
+# 注意：哨兵只负责探测，不再主动发送唤醒指令
+# 发送统一由 ka_boot.py 负责（它有指数退避，避免与哨兵抢限流额度）
+WAKE_CMD = None
+DELEGATE_TO_BOOT = True
 
 FAIL_THRESHOLD = 12      # 连续失败 12 次（约12秒）
 COOLDOWN = 600           # 拉起后冷却 10 分钟
@@ -118,6 +121,15 @@ def main():
             time.sleep(30)
             continue
 
+        if DELEGATE_TO_BOOT:
+            log.info("⚡ 确认隧道真断 → 发送已交由 ka_boot.py 处理（本哨兵只记录）")
+            st["fired"] = st.get("fired", 0) + 1
+            st["last_fire"] = now
+            st["day"] = today
+            save_state(st)
+            fail_count = 0
+            time.sleep(120)
+            continue
         log.info("⚡ 确认隧道真断 → 发拉起指令 → %s", cid)
         try:
             sse = API.send_samantha(cid, WAKE_CMD)
