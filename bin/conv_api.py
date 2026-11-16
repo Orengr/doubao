@@ -234,3 +234,74 @@ def extract_reply(sse_text):
         except Exception: pass
         if t and t not in out: out.append(t)
     return " ".join(out[:8])[:400]
+
+
+# ---- 新接口发送（/samantha/chat/completion，已验证可用）----
+def send_samantha(conv_id, text, create=False):
+    """通过 /samantha/chat/completion 发送。conv_id='0' 或 create=True 时新建会话。
+    返回 SSE 全文。成功特征：包含 message_id / event_type。
+    """
+    js = r'''
+(async()=>{
+ try{
+  const ck=Object.fromEntries(document.cookie.split('; ').map(s=>{const i=s.indexOf('=');return[s.slice(0,i),s.slice(i+1)];}));
+  const params={aid:'497858',device_platform:'web',language:'zh',pc_version:'2.41.0',
+    pkg_type:'release_version',real_aid:'497858',region:'CN',samantha_web:'1',sys_region:'CN',
+    'use-olympus-account':'1',version_code:'20800',
+    device_id:ck['s_v_web_id']||'', fp:ck['s_v_web_id']||'',
+    web_tab_id:crypto.randomUUID(), msToken:ck['msToken']||''};
+  const sorted=Object.keys(params).sort().reduce((o,k)=>{o[k]=params[k];return o},{});
+  const qs=new URLSearchParams(sorted).toString();
+  let bogus='';
+  try{ const s=await window.bdms.frontierSign(qs); bogus=s&&(s['X-Bogus']||s['a_bogus'])||''; }catch(e){}
+  const url='/samantha/chat/completion?'+qs+(bogus?'&X-Bogus='+bogus:'');
+  const payload={messages:[{content:JSON.stringify({text:%TEXT%}),content_type:2001,attachments:[],references:[]}],
+    completion_option:{is_regen:false,with_suggest:true,need_create_conversation:%CREATE%,launch_stage:1,
+      is_replace:false,is_delete:false,message_from:0,action_bar_skill_id:0,use_deep_think:false,
+      use_auto_cot:true,resend_for_regen:false,enable_commerce_credit:false,event_id:'0'},
+    evaluate_option:{web_ab_params:''}, conversation_id:%CID%,
+    local_conversation_id:'local_'+crypto.randomUUID().replace(/-/g,''),
+    local_message_id:crypto.randomUUID()};
+  const r=await fetch(url,{method:'POST',credentials:'include',headers:{
+    'Accept':'*/*','Content-Type':'application/json','Origin':'https://www.doubao.com',
+    'Referer':'https://www.doubao.com/chat/','agw-js-conv':'str, str'},
+    body:JSON.stringify(payload)});
+  return await r.text();
+ }catch(e){return 'EXEC_ERR '+e.message}
+})()
+'''.replace("%TEXT%", json.dumps(text, ensure_ascii=False)) \
+   .replace("%CID%", json.dumps(str(conv_id))) \
+   .replace("%CREATE%", "true" if (create or str(conv_id) == "0") else "false")
+    return page_eval(js, 120) or ""
+
+def send_and_get_ids(conv_id, text, create=False, auto_save=True):
+    """发送并返回 (ok, message_id, conversation_id, raw)。
+    create=True 或 conv_id='0' 时新建会话，并自动把新会话存入 DB 作为保活会话。
+    """
+    raw = send_samantha(conv_id, text, create=create)
+    if not raw:
+        return False, None, None, ""
+    if "710022002" in raw or "710022004" in raw:
+        return False, None, None, raw
+    import re as _re
+    mid = (_re.search(r'"message_id":"(\d+)"', raw) or [None, None])[1]
+    conv = (_re.search(r'"conversation_id":"(\d+)"', raw) or [None, None])[1]
+    ok = bool(mid or '"event_type":2002' in raw)
+
+    # 自动保存会话（新建或首次发送）
+    if ok and conv and auto_save:
+        try:
+            import accounts_db as _DB
+            accs = _DB.list_accounts()
+            uid = accs[0]["uid"] if accs else None
+            if uid:
+                acc = _DB.get_account(uid)
+                if not acc or not acc.get("keep_conv_id"):
+                    name = "老王（A）"
+                    _DB.set_keep_conv(uid, conv, name)
+                    _DB.upsert_conv(uid, conv, name=name, alive=1)
+                else:
+                    _DB.upsert_conv(uid, conv, alive=1)
+        except Exception:
+            pass
+    return ok, mid, conv, raw
