@@ -199,7 +199,7 @@ pre{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:1
 </div>
 <main id="view"><div class="card dim">加载中…</div></main>
 <script>
-var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["phpinfo","PHP 环境","◐","监控"],["files","文件管理","▤","运维"],["disk","磁盘占用","◪","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
+var NAV=[["overview","概览","◉","监控"],["health","服务健康","◈","监控"],["phpinfo","PHP 环境","◐","监控"],["sessions","豆包会话","◧","监控"],["files","文件管理","▤","运维"],["disk","磁盘占用","◪","运维"],["sites","网站","◎","建站"],["databases","数据库","▦","建站"],["ftp","FTP 账户","⇄","建站"],["cron","计划任务","⏱","运维"],["procs","进程","▣","运维"],["containers","容器应用","▢","运维"],["backup","备份","⇩","运维"],["terminal","终端","＞","运维"]];
 var cur="overview",S={},es=null;
 function agentErr(o){var m=(o&&(o.error||o.detail))||'沙箱暂时离线';return '沙箱未连接：'+m+'（实例可能正在重建，约20秒后自动恢复）'}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -222,6 +222,7 @@ async function load(){
     else if(cur==='procs'){S.p=await api('/api/panel/procs');if(!Array.isArray(S.p))throw new Error(agentErr(S.p));v.innerHTML=procsHTML(S.p)}
     else if(cur==='containers'){S.c=await api('/api/panel/containers');if(!Array.isArray(S.c))throw new Error(agentErr(S.c));v.innerHTML=contHTML(S.c)}
     else if(cur==='cron'){S.cr=await api('/api/panel/cron');if(!Array.isArray(S.cr))throw new Error(agentErr(S.cr));v.innerHTML=cronHTML(S.cr)}
+    else if(cur==='sessions'){S.ss=await api('/api/panel/sessions');if(!Array.isArray(S.ss))throw new Error(agentErr(S.ss));v.innerHTML=sessionHTML(S.ss)}
     else if(cur==='phpinfo'){S.ph=await api('/api/panel/phpinfo');if(!S.ph||!S.ph.ok)throw new Error(agentErr(S.ph));v.innerHTML=phpHTML(S.ph)}
     else if(cur==='disk'){S.dk=await api('/api/panel/disk');if(!Array.isArray(S.dk))throw new Error(agentErr(S.dk));v.innerHTML=diskHTML(S.dk)}
     else if(cur==='backup'){v.innerHTML=backupHTML()}
@@ -338,6 +339,19 @@ function contHTML(c){
    +'<h2>启动应用</h2><div class="card"><div style="margin-bottom:8px"><input id="cn" placeholder="应用名，如 web1"></div><div style="margin-bottom:8px"><input id="cr" placeholder="rootfs 路径（可选）"></div><div style="margin-bottom:10px"><input id="cc" placeholder="命令，如 python3 -m http.server 8080"></div><button onclick="runC()">启动</button></div><pre id="cout" class="hide"></pre>';
 }
 async function runC(){var b={name:document.getElementById('cn').value||'app',rootfs:document.getElementById('cr').value||'',cmd:document.getElementById('cc').value||'/bin/sh'};var r=await api('/api/panel/run_container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});var el=document.getElementById('cout');el.classList.remove('hide');el.textContent=JSON.stringify(r,null,2)}
+function sessionHTML(list){
+  if(!list.length) return '<div class="card dim">没有会话</div>';
+  var alive=0; for(var i=0;i<list.length;i++){ if(list[i].alive) alive++; }
+  var rows = list.map(function(x){
+    var badge = x.alive ? '<span class="pill ok">存活</span>' : '<span class="pill err">空</span>';
+    var keep = x.keep ? '<span class="pill" style="background:rgba(77,141,255,.15);color:#4d8dff">保活</span>' : '';
+    return '<div class="card" style="margin-bottom:9px"><div class="row"><span class="k">'+esc(x.name)+'</span>'+keep+badge+'</div>'
+      +'<div class="row"><span class="k">会话ID</span><span class="v dim" style="font-size:11px">'+esc(x.conv_id)+'</span></div>'
+      +'<div class="row"><span class="k">消息数</span><span class="v">'+x.msg_count+'</span></div>'
+      +'</div>';
+  }).join('');
+  return '<h2>豆包会话 ('+list.length+' 个，'+alive+' 存活)</h2>'+rows;
+}
 function phpHTML(p){
   return '<h2>PHP 环境</h2><div class="card">'
    +'<div class="row"><span class="k">版本</span><span class="v">'+esc((p.version||"").split("\n")[0])+'</span></div>'
@@ -666,7 +680,19 @@ class H(BaseHTTPRequestHandler):
                     "cron_add": "/api/cron_add", "backup": "/api/backup",
                     "run_container": "/api/run_container",
                 }
-                if sub in GET_MAP:
+                if sub == "sessions":
+                    try:
+                        import conv_api as _CA
+                        import accounts_db as _DB
+                        lst = _CA.list_conv_with_health(30)
+                        accs = _DB.list_accounts()
+                        keep = accs[0].get("keep_conv_id") if accs else None
+                        for x in lst:
+                            x["keep"] = (str(x.get("conv_id")) == str(keep))
+                        self._send(lst)
+                    except Exception as e:
+                        self._send({"error": "sessions: " + str(e)[:150]})
+                elif sub in GET_MAP:
                     self._send(agent_get(GET_MAP[sub]))
                 elif sub == "site_log":
                     self._send(agent_get("/api/site_log?name=" + urllib.parse.quote(g("name","")) + "&n=" + g("n","50")))
