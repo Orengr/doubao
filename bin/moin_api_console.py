@@ -286,6 +286,7 @@ function sitesHTML(s){
       +'<button class="sec sm" data-act="domain" data-name="'+esc(x.name)+'">绑定域名</button>'
       +'<button class="sec sm" data-act="ssl" data-name="'+esc(x.name)+'">开 SSL</button>'
       +'<button class="sec sm" data-act="proxy" data-name="'+esc(x.name)+'">反代</button>'
+      +'<button class="sec sm" data-act="log" data-name="'+esc(x.name)+'">日志</button>'
       +'<button class="sec sm" data-act="del" data-name="'+esc(x.name)+'">删除</button>'
       +'</div></div>';
   }).join("") : '<div class="card dim">暂无站点，下面新建一个</div>';
@@ -307,6 +308,7 @@ async function siteAct(act,name){
   if(act==="domain"){ var d=prompt("输入要绑定的域名，如 blog.example.com"); if(!d)return; body={name:name,domain:d}; url="/api/panel/site_add_domain"; }
   else if(act==="ssl"){ body={name:name,enable:true}; url="/api/panel/site_ssl"; }
   else if(act==="proxy"){ var t=prompt("输入后端地址，如 http://127.0.0.1:8080"); if(!t)return; body={name:name,target:t}; url="/api/panel/site_proxy"; }
+  else if(act==="log"){ el.classList.remove("hide"); el.textContent="读取日志…"; var r=await api("/api/panel/site_log?name="+encodeURIComponent(name)+"&n=60"); el.textContent=r.lines||r.error||JSON.stringify(r); return; }
   else if(act==="del"){ body={name:name}; url="/api/panel/site_delete"; }
   el.classList.remove("hide"); el.textContent="执行中…";
   var r=await api(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});

@@ -108,13 +108,18 @@ def main():
             try:
                 ok, mid, conv, raw = API.send_and_get_ids(cid, topic)
                 if ok:
+                    st["rl_count"] = 0
                     log.info("    ✅ 已发送")
                 else:
                     tag = "限流" if "710022004" in (raw or "") else ("拦截" if "710022002" in (raw or "") else "失败")
                     log.warning("    ❌ %s", tag)
                     if tag == "限流":
-                        log.info("    遇限流，暂停 10 分钟")
-                        time.sleep(600)
+                        # 实测：成功1条后冷却已超6分钟；遇限流要大幅退避
+                        backoff = min(600 * (st.get("rl_count", 0) + 1), 3600)
+                        st["rl_count"] = st.get("rl_count", 0) + 1
+                        save(st)
+                        log.warning("    遇限流，退避 %d 秒（累计 %d 次）", backoff, st["rl_count"])
+                        time.sleep(backoff)
                         break
             except Exception as e:
                 log.error("    异常: %s", str(e)[:150])
