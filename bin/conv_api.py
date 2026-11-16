@@ -276,20 +276,23 @@ def send_samantha(conv_id, text, create=False):
 
 def send_and_get_ids(conv_id, text, create=False, auto_save=True):
     """发送并返回 (ok, message_id, conversation_id, raw)。
-    create=True 或 conv_id='0' 时新建会话，并自动把新会话存入 DB 作为保活会话。
+    严格判定：必须含 message_id 或 event_type":2002，且不含任何 error_code。
     """
     raw = send_samantha(conv_id, text, create=create)
     if not raw:
         return False, None, None, ""
-    if "710022002" in raw or "710022004" in raw:
-        return False, None, None, raw
+    # 任何错误码都算失败
+    for err in ("710022002", "710022004", "710012001", "710020202"):
+        if err in raw:
+            return False, None, None, raw
     import re as _re
     mid = (_re.search(r'"message_id":"(\d+)"', raw) or [None, None])[1]
     conv = (_re.search(r'"conversation_id":"(\d+)"', raw) or [None, None])[1]
-    ok = bool(mid or '"event_type":2002' in raw)
+    ok = bool(mid) and bool(conv)
+    if not ok:
+        return False, mid, conv, raw
 
-    # 自动保存会话（新建或首次发送）
-    if ok and conv and auto_save:
+    if auto_save and conv:
         try:
             import accounts_db as _DB
             accs = _DB.list_accounts()
@@ -297,11 +300,10 @@ def send_and_get_ids(conv_id, text, create=False, auto_save=True):
             if uid:
                 acc = _DB.get_account(uid)
                 if not acc or not acc.get("keep_conv_id"):
-                    name = "老王（A）"
-                    _DB.set_keep_conv(uid, conv, name)
-                    _DB.upsert_conv(uid, conv, name=name, alive=1)
+                    _DB.set_keep_conv(uid, conv, "老王（A）")
+                    _DB.upsert_conv(uid, conv, name="老王（A）", alive=1)
                 else:
                     _DB.upsert_conv(uid, conv, alive=1)
         except Exception:
             pass
-    return ok, mid, conv, raw
+    return True, mid, conv, raw
